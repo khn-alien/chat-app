@@ -159,6 +159,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <script>
     const firebaseConfig = {
@@ -173,6 +174,7 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
+    const storage = firebase.storage();
 
     let currentUser = null;
 
@@ -204,7 +206,8 @@
         text: msg,
         sender: currentUser.email,
         timestamp: Date.now(),
-        seen: false
+        seen: false,
+        imageUrl: ''
       });
 
       document.getElementById('msgInput').value = '';
@@ -217,12 +220,23 @@
         const data = snapshot.val();
         const div = document.createElement('div');
         div.className = 'msg ' + (data.sender === currentUser.email ? 'me' : 'other');
-        div.innerHTML = `
-          <div><strong>${data.sender}</strong></div>
-          <div>${data.text}</div>
-          <div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>
-          <div class="${data.seen ? 'seen' : 'not-seen'}">${data.seen ? 'Seen' : 'Not Seen'}</div>
-        `;
+
+        if (data.imageUrl) {
+          div.innerHTML = `
+            <div><strong>${data.sender}</strong></div>
+            <div><img src="${data.imageUrl}" alt="image" style="max-width: 100%; height: auto;"></div>
+            <div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>
+            <div class="${data.seen ? 'seen' : 'not-seen'}">${data.seen ? 'Seen' : 'Not Seen'}</div>
+          `;
+        } else {
+          div.innerHTML = `
+            <div><strong>${data.sender}</strong></div>
+            <div>${data.text}</div>
+            <div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>
+            <div class="${data.seen ? 'seen' : 'not-seen'}">${data.seen ? 'Seen' : 'Not Seen'}</div>
+          `;
+        }
+
         messagesDiv.appendChild(div);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
       });
@@ -247,14 +261,15 @@
       const file = document.getElementById('fileInput').files[0];
       if (!file) return;
 
-      const storageRef = firebase.storage().ref('images/' + file.name);
+      const storageRef = storage.ref('images/' + file.name);
       storageRef.put(file).then(snapshot => {
         storageRef.getDownloadURL().then(url => {
           db.ref('messages').push({
-            text: url, // image URL
+            text: '', // Empty text for an image message
             sender: currentUser.email,
             timestamp: Date.now(),
-            seen: false
+            seen: false,
+            imageUrl: url
           });
         });
       });
