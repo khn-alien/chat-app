@@ -267,17 +267,24 @@
         messagesDiv.appendChild(div);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
       });
+
+      db.ref('messages').on('child_changed', snapshot => {
+        const messageId = snapshot.key;
+        const message = snapshot.val();
+        const messageDiv = document.querySelector(`[data-id="${messageId}"]`);
+
+        if (messageDiv) {
+          messageDiv.querySelector('.timestamp').textContent = new Date(message.timestamp).toLocaleTimeString();
+          messageDiv.querySelector('.seen').textContent = message.seen ? 'Seen' : 'Not Seen';
+        }
+      });
     }
 
-    function handleKeyDown(event) {
-      if (event.key === 'Enter') {
-        sendMessage();
-      } else {
-        typingRef.set(true); // Set typing status to true when typing
-        setTimeout(() => {
-          typingRef.set(false); // Set typing status to false after a short delay
-        }, 1000);
-      }
+    function reactToMessage(messageId) {
+      const reaction = prompt("Enter your reaction (e.g. 👍, ❤️)");
+      if (!reaction) return;
+
+      db.ref('messages/' + messageId + '/reactions').push(reaction);
     }
 
     function uploadImage() {
@@ -299,12 +306,9 @@
       db.ref('messages').remove();
     }
 
-    // Reaction function
-    function reactToMessage(messageId) {
-      const reaction = prompt("Enter your reaction (e.g. 👍, ❤️)");
-      if (!reaction) return;
-
-      db.ref('messages/' + messageId + '/reactions').push(reaction);
+    function handleKeyDown(event) {
+      const inputText = document.getElementById('msgInput').value.trim();
+      typingRef.set(inputText.length > 0); // Show typing status if there's text
     }
 
     auth.onAuthStateChanged(user => {
@@ -315,6 +319,7 @@
         loadChat();
       }
     });
+
   </script>
 </body>
 </html>
