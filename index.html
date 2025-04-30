@@ -10,17 +10,23 @@
       margin: 0;
       padding: 0;
       background: #f4f6f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
     }
 
     #app {
-      max-width: 600px;
-      margin: auto;
+      max-width: 650px;
+      width: 100%;
       background: #fff;
-      padding: 1rem;
+      padding: 2rem;
       border-radius: 8px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
       display: flex;
       flex-direction: column;
+      height: 80vh;
+      overflow: hidden;
     }
 
     h2 {
@@ -28,9 +34,9 @@
       color: #333;
     }
 
-    /* Chat Section */
+    /* Chat Messages */
     #messages {
-      height: 400px;
+      flex: 1;
       overflow-y: auto;
       background: #f0f2f5;
       padding: 1rem;
@@ -98,7 +104,7 @@
 
     .input-container input {
       flex: 1;
-      padding: 10px;
+      padding: 12px;
       border-radius: 20px;
       border: 1px solid #ddd;
       font-size: 1rem;
@@ -111,7 +117,7 @@
       background: #0078d4;
       color: white;
       border-radius: 50%;
-      padding: 10px;
+      padding: 12px;
       cursor: pointer;
       border: none;
     }
@@ -140,7 +146,6 @@
       background-color: #005bb5;
     }
 
-    /* File Upload */
     .file-input {
       display: none;
     }
@@ -180,7 +185,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <script>
-    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyA9KPmQOZtSvFv4OI05AxYYpzDwUT1A7nA",
       authDomain: "khn-chat.firebaseapp.com",
@@ -262,8 +266,9 @@
       });
     }
 
-    // Typing status indicator
+    // Handle keypress to trigger typing indicator
     function handleKeyDown(event) {
+      const typingRef = db.ref('typing/' + currentUser.uid);
       const inputText = document.getElementById('msgInput').value;
       if (inputText.length > 0) {
         typingRef.set(true);
@@ -271,6 +276,17 @@
         typingRef.set(false);
       }
     }
+
+    // Show typing indicator for all users
+    typingRef.on('value', snapshot => {
+      const typingStatus = snapshot.val();
+      const typingIndicator = document.getElementById('typingIndicator');
+      if (Object.values(typingStatus).includes(true)) {
+        typingIndicator.style.display = 'block';
+      } else {
+        typingIndicator.style.display = 'none';
+      }
+    });
 
     // Handle image upload
     function uploadImage() {
@@ -288,12 +304,17 @@
       });
     }
 
-    // Clear chat
+    // Clear chat history
     function clearChat() {
       messageRef.remove();
     }
 
-    // Handle auth state change
+    // Update seen status when message is read
+    function updateSeenStatus(messageId) {
+      messageRef.child(messageId).update({ seen: true });
+    }
+
+    // Auth state change handling
     auth.onAuthStateChanged(user => {
       if (user) {
         currentUser = user;
