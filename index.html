@@ -91,10 +91,9 @@
       margin-top: 0.25rem;
     }
 
-    textarea {
-      min-height: 60px;
-      max-height: 120px;
-      resize: vertical;
+    img {
+      max-width: 100%;
+      border-radius: 5px;
     }
   </style>
 </head>
@@ -112,8 +111,9 @@
       <h2>Chat Room</h2>
       <div id="messages"></div>
       <textarea id="msgInput" placeholder="Type a message..."></textarea>
+      <input type="file" id="fileInput" accept="image/*">
       <button onclick="sendMessage()">Send</button>
-      <button onclick="clearChat()">Clear Chat</button>
+      <button onclick="clearChat()" style="background: #800;">Clear Chat</button>
       <button onclick="logout()" style="margin-top: 0.5rem;">Logout</button>
     </div>
   </div>
@@ -122,13 +122,14 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyA9KPmQOZtSvFv4OI05AxYYpzDwUT1A7nA",
       authDomain: "khn-chat.firebaseapp.com",
       projectId: "khn-chat",
-      storageBucket: "khn-chat.firebasestorage.app",
+      storageBucket: "khn-chat.appspot.com",
       messagingSenderId: "127670303843",
       appId: "1:127670303843:web:3e3009ed10712e432c4c56",
       measurementId: "G-MDQQEMCZLR"
@@ -137,6 +138,7 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
+    const storage = firebase.storage();
 
     let currentUser = null;
 
@@ -161,35 +163,43 @@
     }
 
     function sendMessage() {
-      const msg = document.getElementById('msgInput').value.trim();
+      const msgInput = document.getElementById('msgInput');
+      const msg = msgInput.value.trim();
       if (!msg) return;
-
+      msgInput.value = '';
       db.ref('messages').push({
         text: msg,
         sender: currentUser.email,
         timestamp: Date.now()
       });
-
-      document.getElementById('msgInput').value = '';
     }
 
-    function clearChat() {
-      if (confirm("Are you sure you want to clear all chat messages?")) {
-        db.ref('messages').remove();
-        document.getElementById('messages').innerHTML = '';
-      }
+    function uploadImage(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const storageRef = storage.ref(`images/${Date.now()}_${file.name}`);
+      storageRef.put(file).then(snapshot => snapshot.ref.getDownloadURL())
+        .then(url => {
+          db.ref('messages').push({
+            text: `<img src="${url}" />`,
+            sender: currentUser.email,
+            timestamp: Date.now()
+          });
+        });
     }
 
     function loadChat() {
       const messagesDiv = document.getElementById('messages');
       messagesDiv.innerHTML = '';
+      db.ref('messages').off();
       db.ref('messages').on('child_added', snapshot => {
         const data = snapshot.val();
         const div = document.createElement('div');
         div.className = 'msg ' + (data.sender === currentUser.email ? 'me' : 'other');
         div.innerHTML = `
           <div><strong>${data.sender}</strong></div>
-          <div>${data.text.replace(/\n/g, '<br>')}</div>
+          <div>${data.text}</div>
           <div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>
         `;
         messagesDiv.appendChild(div);
@@ -197,18 +207,24 @@
       });
     }
 
-    // Enable Shift+Enter to send
+    function clearChat() {
+      if (confirm("Are you sure you want to clear all messages?")) {
+        db.ref('messages').remove();
+        document.getElementById('messages').innerHTML = '';
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
-      const msgInput = document.getElementById('msgInput');
-      msgInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && e.shiftKey) {
+      document.getElementById('msgInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           sendMessage();
         }
       });
+
+      document.getElementById('fileInput').addEventListener('change', uploadImage);
     });
 
-    // Restore session if logged in
     auth.onAuthStateChanged(user => {
       if (user) {
         currentUser = user;
