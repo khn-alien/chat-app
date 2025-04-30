@@ -178,6 +178,9 @@
 
     let currentUser = null;
 
+    // Monitor typing status in real-time
+    const typingRef = db.ref('typing');
+
     function login() {
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
@@ -210,7 +213,9 @@
         imageUrl: ''
       });
 
+      // Clear input field after sending message
       document.getElementById('msgInput').value = '';
+      typingRef.set(false); // Stop typing indicator after sending message
     }
 
     function loadChat() {
@@ -240,21 +245,27 @@
         messagesDiv.appendChild(div);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
       });
+
+      // Handle typing status in real-time
+      typingRef.on('value', snapshot => {
+        const typingData = snapshot.val();
+        if (typingData) {
+          document.getElementById('typingIndicator').style.display = 'block';
+        } else {
+          document.getElementById('typingIndicator').style.display = 'none';
+        }
+      });
     }
 
     function handleKeyDown(event) {
       if (event.key === 'Enter') {
         sendMessage();
       } else {
-        typingIndicator();
+        typingRef.set(true); // Set typing status to true when typing
+        setTimeout(() => {
+          typingRef.set(false); // Set typing status to false after 1 second
+        }, 2000);
       }
-    }
-
-    function typingIndicator() {
-      document.getElementById('typingIndicator').style.display = 'block';
-      setTimeout(() => {
-        document.getElementById('typingIndicator').style.display = 'none';
-      }, 2000);
     }
 
     function uploadImage() {
@@ -264,13 +275,7 @@
       const storageRef = storage.ref('images/' + file.name);
       storageRef.put(file).then(snapshot => {
         storageRef.getDownloadURL().then(url => {
-          db.ref('messages').push({
-            text: '', // Empty text for an image message
-            sender: currentUser.email,
-            timestamp: Date.now(),
-            seen: false,
-            imageUrl: url
-          });
+          sendMessage(url); // Send image URL as part of the message
         });
       });
     }
@@ -279,12 +284,13 @@
       db.ref('messages').remove();
     }
 
+    // Initializing the app
     auth.onAuthStateChanged(user => {
       if (user) {
         currentUser = user;
         document.getElementById('loginSection').style.display = 'none';
         document.getElementById('chatSection').style.display = 'block';
-        loadChat(); // <--- This must be here
+        loadChat();
       }
     });
   </script>
