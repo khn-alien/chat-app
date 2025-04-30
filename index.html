@@ -12,7 +12,6 @@
       margin: 0;
       padding: 2rem;
     }
-
     #app {
       max-width: 600px;
       margin: auto;
@@ -20,12 +19,6 @@
       padding: 1rem;
       border-radius: 8px;
     }
-
-    h2 {
-      text-align: center;
-      color: white;
-    }
-
     input, button {
       width: 100%;
       padding: 0.75rem;
@@ -34,26 +27,25 @@
       border-radius: 5px;
       font-size: 1rem;
     }
-
-    input {
+    input, textarea {
       background: #222;
       color: white;
     }
-
-    input::placeholder {
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+    input::placeholder, textarea::placeholder {
       color: #aaa;
     }
-
     button {
       background: #444;
       color: white;
       cursor: pointer;
     }
-
     button:hover {
       background: #666;
     }
-
     #messages {
       height: 300px;
       overflow-y: auto;
@@ -65,7 +57,6 @@
       display: flex;
       flex-direction: column;
     }
-
     .msg {
       padding: 0.5rem;
       margin-bottom: 0.5rem;
@@ -74,33 +65,23 @@
       max-width: 80%;
       word-wrap: break-word;
     }
-
     .me {
       background: #2e2e2e;
       align-self: flex-end;
       text-align: right;
     }
-
     .other {
       align-self: flex-start;
     }
-
     .timestamp {
       font-size: 0.7rem;
       color: #aaa;
       margin-top: 0.25rem;
     }
-
-    #typingIndicator {
-      font-size: 0.8rem;
-      color: gray;
-      margin-bottom: 0.5rem;
-    }
-
-    img {
+    .image-msg img {
       max-width: 100%;
       border-radius: 5px;
-      margin-top: 5px;
+      margin-top: 0.5rem;
     }
   </style>
 </head>
@@ -117,10 +98,10 @@
     <div id="chatSection" style="display:none;">
       <h2>Chat Room</h2>
       <div id="messages"></div>
-      <div id="typingIndicator"></div>
-      <input type="file" id="fileInput" accept="image/*">
-      <input id="msgInput" type="text" placeholder="Type a message...">
+      <textarea id="msgInput" placeholder="Type a message..."></textarea>
+      <input type="file" id="imageInput" accept="image/*">
       <button onclick="sendMessage()">Send</button>
+      <button onclick="clearChat()" style="background: darkred;">Clear Chat</button>
       <button onclick="logout()" style="margin-top: 0.5rem;">Logout</button>
     </div>
   </div>
@@ -140,11 +121,12 @@
       messagingSenderId: "127670303843",
       appId: "1:127670303843:web:3e3009ed10712e432c4c56"
     };
-    firebase.initializeApp(firebaseConfig);
 
+    firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
     const storage = firebase.storage();
+
     let currentUser = null;
 
     function login() {
@@ -153,11 +135,9 @@
       auth.signInWithEmailAndPassword(email, password)
         .then(userCredential => {
           currentUser = userCredential.user;
-          db.ref('users/' + currentUser.uid).set({ email: currentUser.email });
           document.getElementById('loginSection').style.display = 'none';
           document.getElementById('chatSection').style.display = 'block';
           loadChat();
-          monitorTyping();
         })
         .catch(err => {
           document.getElementById('loginStatus').textContent = err.message;
@@ -169,33 +149,31 @@
     }
 
     function sendMessage() {
-      const msgInput = document.getElementById('msgInput');
-      const msg = msgInput.value.trim();
-      const fileInput = document.getElementById('fileInput');
-      const file = fileInput.files[0];
+      const text = document.getElementById('msgInput').value.trim();
+      const imageFile = document.getElementById('imageInput').files[0];
+      if (!text && !imageFile) return;
 
-      if (!msg && !file) return;
-
-      const sendData = (url = null) => {
-        db.ref('messages').push({
-          text: msg || '',
-          sender: currentUser.email,
-          timestamp: Date.now(),
-          image: url || null,
-          seen: false
-        });
-        msgInput.value = '';
-        fileInput.value = '';
+      const msgData = {
+        sender: currentUser.email,
+        timestamp: Date.now()
       };
 
-      if (file) {
-        const ref = storage.ref('images/' + Date.now() + '_' + file.name);
-        ref.put(file).then(snapshot => {
-          snapshot.ref.getDownloadURL().then(sendData);
+      if (text) msgData.text = text;
+
+      if (imageFile) {
+        const ref = storage.ref(`chatImages/${Date.now()}_${imageFile.name}`);
+        ref.put(imageFile).then(snapshot => {
+          snapshot.ref.getDownloadURL().then(url => {
+            msgData.image = url;
+            db.ref('messages').push(msgData);
+          });
         });
       } else {
-        sendData();
+        db.ref('messages').push(msgData);
       }
+
+      document.getElementById('msgInput').value = '';
+      document.getElementById('imageInput').value = '';
     }
 
     function loadChat() {
@@ -203,50 +181,24 @@
       messagesDiv.innerHTML = '';
       db.ref('messages').on('child_added', snapshot => {
         const data = snapshot.val();
-        const key = snapshot.key;
         const div = document.createElement('div');
         div.className = 'msg ' + (data.sender === currentUser.email ? 'me' : 'other');
         div.innerHTML = `
           <div><strong>${data.sender}</strong></div>
           ${data.text ? `<div>${data.text}</div>` : ''}
-          ${data.image ? `<img src="${data.image}">` : ''}
+          ${data.image ? `<div class="image-msg"><img src="${data.image}" /></div>` : ''}
           <div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>
-          ${data.sender === currentUser.email ? `<button onclick="deleteMessage('${key}')">Delete</button>` : ''}
-          ${data.seen && data.sender === currentUser.email ? '<div style="font-size: 0.7rem; color: #0f0;">Seen</div>' : ''}
         `;
         messagesDiv.appendChild(div);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
-        // Mark as seen
-        if (data.sender !== currentUser.email) {
-          db.ref('messages/' + key).update({ seen: true });
-        }
       });
     }
 
-    function deleteMessage(key) {
-      db.ref('messages/' + key).remove();
-    }
-
-    function monitorTyping() {
-      const msgInput = document.getElementById('msgInput');
-      msgInput.addEventListener('input', () => {
-        db.ref('typing/' + currentUser.uid).set(currentUser.email);
-        setTimeout(() => {
-          db.ref('typing/' + currentUser.uid).remove();
-        }, 2000);
-      });
-
-      db.ref('typing').on('value', snapshot => {
-        const typingIndicator = document.getElementById('typingIndicator');
-        const usersTyping = [];
-        snapshot.forEach(child => {
-          if (child.val() !== currentUser.email) {
-            usersTyping.push(child.val());
-          }
-        });
-        typingIndicator.textContent = usersTyping.length ? `${usersTyping.join(', ')} typing...` : '';
-      });
+    function clearChat() {
+      if (confirm("Are you sure you want to delete all messages?")) {
+        db.ref('messages').remove();
+        document.getElementById('messages').innerHTML = '';
+      }
     }
 
     auth.onAuthStateChanged(user => {
@@ -255,7 +207,14 @@
         document.getElementById('loginSection').style.display = 'none';
         document.getElementById('chatSection').style.display = 'block';
         loadChat();
-        monitorTyping();
+      }
+    });
+
+    // Support multiline messages with Shift+Enter
+    document.getElementById('msgInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
       }
     });
   </script>
