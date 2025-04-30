@@ -3,21 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Real-Time Chat with Image Upload</title>
+  <title>Enhanced Chat App</title>
   <style>
+    :root {
+      --primary: #007bff;
+      --secondary: #6c757d;
+      --success: #28a745;
+      --danger: #dc3545;
+    }
+
     body {
       font-family: 'Arial', sans-serif;
       margin: 0;
       padding: 20px;
       background: #f0f2f5;
-      display: flex;
-      justify-content: center;
       min-height: 100vh;
     }
 
     #app {
-      width: 100%;
       max-width: 800px;
+      margin: 0 auto;
       background: white;
       border-radius: 12px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
@@ -39,10 +44,11 @@
       padding: 10px;
       border-radius: 8px;
       max-width: 70%;
+      position: relative;
     }
 
     .my-message {
-      background: #007bff;
+      background: var(--primary);
       color: white;
       margin-left: auto;
     }
@@ -52,15 +58,16 @@
       color: #333;
     }
 
-    .image-message {
-      max-width: 300px;
-      margin-top: 5px;
+    .message img {
+      max-width: 100%;
       border-radius: 8px;
+      margin-top: 5px;
     }
 
     .input-container {
       display: flex;
       gap: 10px;
+      position: relative;
     }
 
     input[type="text"] {
@@ -73,91 +80,123 @@
 
     button {
       padding: 12px 20px;
-      background: #007bff;
-      color: white;
       border: none;
       border-radius: 8px;
       cursor: pointer;
+      transition: opacity 0.2s;
     }
 
-    button:disabled {
-      background: #6c757d;
-      cursor: not-allowed;
+    .primary-btn {
+      background: var(--primary);
+      color: white;
+    }
+
+    .danger-btn {
+      background: var(--danger);
+      color: white;
     }
 
     .file-input-label {
-      display: inline-block;
+      display: flex;
+      align-items: center;
       padding: 12px;
-      background: #28a745;
+      background: var(--success);
       color: white;
       border-radius: 8px;
       cursor: pointer;
-    }
-
-    .timestamp {
-      font-size: 0.8rem;
-      color: #666;
-      margin-top: 5px;
     }
 
     .loading {
       display: inline-block;
       width: 20px;
       height: 20px;
-      border: 3px solid rgba(0,0,0,0.3);
+      border: 3px solid rgba(255,255,255,0.3);
       border-radius: 50%;
-      border-top-color: #000;
-      animation: spin 1s ease-in-out infinite;
+      border-top-color: #fff;
+      animation: spin 1s linear infinite;
     }
 
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    .typing-indicator {
+      position: absolute;
+      bottom: 100%;
+      right: 0;
+      background: #fff;
+      padding: 5px 10px;
+      border-radius: 15px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      font-size: 0.9em;
+    }
+
+    .online-users {
+      margin-bottom: 15px;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+
+    .timestamp {
+      font-size: 0.75em;
+      opacity: 0.8;
+      margin-top: 5px;
+      display: block;
+    }
+
+    .message-actions {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      display: none;
+    }
+
+    .message:hover .message-actions {
+      display: block;
+    }
   </style>
 </head>
 <body>
   <div id="app">
-    <div id="login" style="display: none;">
+    <div id="auth-section" style="display: none;">
       <h2>Login</h2>
       <input type="email" id="email" placeholder="Email">
       <input type="password" id="password" placeholder="Password">
-      <button onclick="login()">Login</button>
-      <p id="loginError" style="color: red;"></p>
+      <button class="primary-btn" onclick="handleLogin()">Login</button>
+      <p id="auth-error" style="color: var(--danger);"></p>
     </div>
 
-    <div id="chat" style="display: none;">
+    <div id="chat-section" style="display: none;">
+      <div class="online-users" id="online-users"></div>
       <div id="messages"></div>
+      <div class="typing-indicator" id="typing-indicator"></div>
       <div class="input-container">
         <label class="file-input-label">
-          📎 Upload
-          <input type="file" id="fileInput" accept="image/*" style="display: none;">
+          📎 <input type="file" id="file-input" accept="image/*" style="display: none;">
         </label>
-        <input type="text" id="messageInput" placeholder="Type your message...">
-        <button id="sendButton" onclick="sendMessage()">Send</button>
+        <input type="text" id="message-input" placeholder="Type a message...">
+        <button class="primary-btn" id="send-btn" onclick="sendMessage()">Send</button>
       </div>
-      <button onclick="logout()" style="margin-top: 10px;">Logout</button>
+      <button class="danger-btn" onclick="handleLogout()" style="margin-top: 10px;">Logout</button>
     </div>
   </div>
 
-  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <script>
-    // Replace with your Firebase config
     const firebaseConfig = {
-      apiKey: "AIzaSyA9KPmQOZtSvFv4OI05AxYYpzDwUT1A7nA",
-      authDomain: "khn-chat.firebaseapp.com",
-      projectId: "khn-chat",
-      storageBucket: "khn-chat.appspot.com",
-      messagingSenderId: "127670303843",
-      appId: "1:127670303843:web:3e3009ed10712e432c4c56",
-      measurementId: "G-MDQQEMCZLR"
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
     };
 
-    // Initialize Firebase
     const app = firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
@@ -166,74 +205,68 @@
     let currentUser = null;
     let messagesRef = db.ref('messages');
     let typingRef = db.ref('typing');
+    let usersRef = db.ref('users');
 
-    // Auth state listener
+    // Auth State Listener
     auth.onAuthStateChanged(user => {
       if (user) {
         currentUser = user;
-        document.getElementById('login').style.display = 'none';
-        document.getElementById('chat').style.display = 'block';
-        setupMessageListener();
+        initChat();
+        trackUserPresence();
       } else {
-        document.getElementById('login').style.display = 'block';
-        document.getElementById('chat').style.display = 'none';
+        showAuthSection();
       }
     });
 
-    // Login function
-    async function login() {
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-      try {
-        await auth.signInWithEmailAndPassword(email, password);
-      } catch (error) {
-        document.getElementById('loginError').textContent = error.message;
-      }
+    // Initialize Chat
+    function initChat() {
+      showChatSection();
+      setupMessageListener();
+      setupTypingListener();
+      setupPresenceListener();
+      setupEventListeners();
     }
 
-    // Logout function
-    function logout() {
-      auth.signOut();
-    }
-
-    // Message listener
+    // Message Handling
     function setupMessageListener() {
       messagesRef.on('child_added', snapshot => {
         const message = snapshot.val();
-        displayMessage(message);
+        displayMessage(message, snapshot.key);
       });
     }
 
-    // Display messages
-    function displayMessage(message) {
+    function displayMessage(message, messageId) {
       const messagesDiv = document.getElementById('messages');
-      const messageDiv = document.createElement('div');
-      messageDiv.className = `message ${message.sender === currentUser.email ? 'my-message' : 'other-message'}`;
+      const messageElement = document.createElement('div');
       
-      let content = `
-        <div>${message.text || ''}</div>
-        ${message.imageUrl ? `<img src="${message.imageUrl}" class="image-message">` : ''}
-        <div class="timestamp">
-          ${new Date(message.timestamp).toLocaleString()}
+      messageElement.className = `message ${message.sender === currentUser.email ? 'my-message' : 'other-message'}`;
+      messageElement.innerHTML = `
+        <div class="message-actions">
+          ${message.sender === currentUser.email ? 
+            `<button onclick="deleteMessage('${messageId}')">🗑</button>` : ''}
         </div>
+        ${message.text || ''}
+        ${message.imageUrl ? `<img src="${message.imageUrl}" loading="lazy">` : ''}
+        <span class="timestamp">
+          ${new Date(message.timestamp).toLocaleTimeString()} • 
+          ${message.sender.split('@')[0]}
+        </span>
       `;
       
-      messageDiv.innerHTML = content;
-      messagesDiv.appendChild(messageDiv);
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      messagesDiv.appendChild(messageElement);
+      scrollToBottomIfNeeded();
     }
 
-    // Send message
     async function sendMessage() {
-      const input = document.getElementById('messageInput');
+      const input = document.getElementById('message-input');
       const text = input.value.trim();
-      const file = document.getElementById('fileInput').files[0];
+      const file = document.getElementById('file-input').files[0];
 
       if (!text && !file) return;
 
       try {
         if (file) {
-          await uploadImage(file);
+          await uploadFile(file);
         } else {
           await messagesRef.push({
             text,
@@ -242,46 +275,146 @@
           });
         }
         input.value = '';
-        document.getElementById('fileInput').value = '';
+        document.getElementById('file-input').value = '';
       } catch (error) {
-        console.error('Error sending message:', error);
-        alert('Failed to send message: ' + error.message);
+        showError('Failed to send message: ' + error.message);
       }
     }
 
-    // Image upload handler
-    async function uploadImage(file) {
-      const sendButton = document.getElementById('sendButton');
+    // File Upload
+    async function uploadFile(file) {
+      const sendBtn = document.getElementById('send-btn');
       try {
-        sendButton.disabled = true;
-        sendButton.innerHTML = '<div class="loading"></div>';
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<div class="loading"></div>';
 
-        // Create storage reference
-        const storageRef = storage.ref(`images/${currentUser.uid}/${Date.now()}_${file.name}`);
+        const storageRef = storage.ref(`messages/${currentUser.uid}/${Date.now()}_${file.name}`);
         const snapshot = await storageRef.put(file);
-        const downloadURL = await snapshot.ref.getDownloadURL();
+        const url = await snapshot.ref.getDownloadURL();
 
-        // Save message with image URL
         await messagesRef.push({
-          imageUrl: downloadURL,
+          imageUrl: url,
           sender: currentUser.email,
           timestamp: Date.now()
         });
       } finally {
-        sendButton.disabled = false;
-        sendButton.textContent = 'Send';
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send';
       }
     }
 
-    // Enter key handler
-    document.getElementById('messageInput').addEventListener('keypress', e => {
-      if (e.key === 'Enter') sendMessage();
-    });
+    // Presence System
+    function trackUserPresence() {
+      const userStatusRef = db.ref('.info/connected');
+      const userRef = usersRef.child(currentUser.uid);
 
-    // File input handler
-    document.getElementById('fileInput').addEventListener('change', function() {
-      if (this.files[0]) sendMessage();
-    });
+      userStatusRef.on('value', snapshot => {
+        if (snapshot.val()) {
+          userRef.onDisconnect().remove();
+          userRef.set({
+            email: currentUser.email,
+            lastActive: Date.now(),
+            online: true
+          });
+        }
+      });
+    }
+
+    function setupPresenceListener() {
+      usersRef.on('value', snapshot => {
+        const users = snapshot.val() || {};
+        const onlineUsers = Object.values(users).filter(user => user.online);
+        updateOnlineUsers(onlineUsers);
+      });
+    }
+
+    // Typing Indicator
+    function setupTypingListener() {
+      let typingTimeout;
+      const messageInput = document.getElementById('message-input');
+
+      messageInput.addEventListener('input', () => {
+        typingRef.child(currentUser.uid).set(true);
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+          typingRef.child(currentUser.uid).set(false);
+        }, 1000);
+      });
+
+      typingRef.on('value', snapshot => {
+        const typers = Object.entries(snapshot.val() || {})
+          .filter(([uid, isTyping]) => uid !== currentUser.uid && isTyping)
+          .map(([uid]) => usersRef.child(uid).once('value'))
+          .then(snapshots => {
+            const names = snapshots.map(s => s.val().email.split('@')[0]);
+            document.getElementById('typing-indicator').textContent = 
+              names.length ? `${names.join(', ')} typing...` : '';
+          });
+      });
+    }
+
+    // UI Helpers
+    function scrollToBottomIfNeeded() {
+      const messagesDiv = document.getElementById('messages');
+      if (messagesDiv.scrollTop > messagesDiv.scrollHeight - messagesDiv.clientHeight - 100) {
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+    }
+
+    function updateOnlineUsers(users) {
+      const onlineDiv = document.getElementById('online-users');
+      onlineDiv.textContent = `Online: ${users.map(u => u.email.split('@')[0]).join(', ')}`;
+    }
+
+    function showAuthSection() {
+      document.getElementById('auth-section').style.display = 'block';
+      document.getElementById('chat-section').style.display = 'none';
+    }
+
+    function showChatSection() {
+      document.getElementById('auth-section').style.display = 'none';
+      document.getElementById('chat-section').style.display = 'block';
+    }
+
+    function showError(message) {
+      const errorDiv = document.getElementById('auth-error');
+      errorDiv.textContent = message;
+      setTimeout(() => errorDiv.textContent = '', 3000);
+    }
+
+    // Auth Handlers
+    async function handleLogin() {
+      try {
+        await auth.signInWithEmailAndPassword(
+          document.getElementById('email').value,
+          document.getElementById('password').value
+        );
+      } catch (error) {
+        showError(error.message);
+      }
+    }
+
+    function handleLogout() {
+      auth.signOut();
+    }
+
+    // Message Actions
+    async function deleteMessage(messageId) {
+      if (confirm('Delete this message?')) {
+        await messagesRef.child(messageId).remove();
+      }
+    }
+
+    // Event Listeners
+    function setupEventListeners() {
+      document.getElementById('message-input').addEventListener('keypress', e => {
+        if (e.key === 'Enter') sendMessage();
+      });
+
+      document.getElementById('file-input').addEventListener('change', function() {
+        if (this.files[0]) sendMessage();
+      });
+    }
   </script>
 </body>
 </html>
