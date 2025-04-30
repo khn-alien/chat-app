@@ -74,6 +74,7 @@
       background: #eef2f7;
       max-width: 80%;
       word-wrap: break-word;
+      position: relative;
     }
 
     .me {
@@ -97,7 +98,9 @@
       font-size: 0.8rem;
       color: #aaa;
       font-style: italic;
-      text-align: center;
+      position: absolute;
+      right: 10px;
+      top: 0;
     }
 
     .seen {
@@ -126,6 +129,18 @@
       cursor: pointer;
       border-radius: 5px;
       margin-right: 1rem;
+    }
+
+    .reaction {
+      cursor: pointer;
+      margin-left: 5px;
+      font-size: 1.5rem;
+    }
+
+    .reaction-container {
+      display: flex;
+      justify-content: flex-start;
+      margin-top: 0.25rem;
     }
   </style>
 </head>
@@ -209,7 +224,8 @@
         sender: currentUser.email,
         timestamp: Date.now(),
         seen: false,
-        imageUrl: imageUrl
+        imageUrl: imageUrl,
+        reactions: {}
       });
 
       // Clear input field after sending message
@@ -225,21 +241,28 @@
         const div = document.createElement('div');
         div.className = 'msg ' + (data.sender === currentUser.email ? 'me' : 'other');
 
-        if (data.imageUrl) {
-          div.innerHTML = `
-            <div><strong>${data.sender}</strong></div>
-            <div><img src="${data.imageUrl}" alt="image" style="max-width: 100%; height: auto;"></div>
-            <div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>
-            <div class="${data.seen ? 'seen' : 'not-seen'}">${data.seen ? 'Seen' : 'Not Seen'}</div>
-          `;
-        } else {
-          div.innerHTML = `
-            <div><strong>${data.sender}</strong></div>
-            <div>${data.text}</div>
-            <div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>
-            <div class="${data.seen ? 'seen' : 'not-seen'}">${data.seen ? 'Seen' : 'Not Seen'}</div>
-          `;
+        const messageContent = `
+          <div><strong>${data.sender}</strong></div>
+          <div>${data.text}</div>
+          ${data.imageUrl ? `<div><img src="${data.imageUrl}" alt="image" style="max-width: 100%; height: auto;"></div>` : ''}
+          <div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>
+          <div class="${data.seen ? 'seen' : 'not-seen'}">${data.seen ? 'Seen' : 'Not Seen'}</div>
+        `;
+
+        div.innerHTML = messageContent;
+        const reactionsDiv = document.createElement('div');
+        reactionsDiv.className = 'reaction-container';
+        
+        for (let emoji in data.reactions) {
+          const span = document.createElement('span');
+          span.className = 'reaction';
+          span.textContent = emoji;
+          reactionsDiv.appendChild(span);
         }
+
+        div.appendChild(reactionsDiv);
+
+        div.onclick = () => reactToMessage(snapshot.key);
 
         messagesDiv.appendChild(div);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -252,8 +275,8 @@
       } else {
         typingRef.set(true); // Set typing status to true when typing
         setTimeout(() => {
-          typingRef.set(false); // Set typing status to false after 1 second
-        }, 2000);
+          typingRef.set(false); // Set typing status to false after a short delay
+        }, 1000);
       }
     }
 
@@ -276,14 +299,14 @@
       db.ref('messages').remove();
     }
 
-    // Monitor typing status in real-time
-    typingRef.on('value', (snapshot) => {
-      const typing = snapshot.val();
-      const typingIndicator = document.getElementById('typingIndicator');
-      typingIndicator.style.display = typing ? 'block' : 'none';
-    });
+    // Reaction function
+    function reactToMessage(messageId) {
+      const reaction = prompt("Enter your reaction (e.g. 👍, ❤️)");
+      if (!reaction) return;
 
-    // Initialize the app
+      db.ref('messages/' + messageId + '/reactions').push(reaction);
+    }
+
     auth.onAuthStateChanged(user => {
       if (user) {
         currentUser = user;
