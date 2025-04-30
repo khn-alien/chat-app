@@ -7,145 +7,148 @@
   <style>
     body {
       font-family: 'Arial', sans-serif;
-      background: #f4f4f4;
-      color: #333;
       margin: 0;
-      padding: 1rem;
+      padding: 0;
+      background: #f4f6f9;
     }
 
     #app {
       max-width: 600px;
       margin: auto;
       background: #fff;
-      padding: 2rem;
+      padding: 1rem;
       border-radius: 8px;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
     }
 
     h2 {
       text-align: center;
-      margin-bottom: 1rem;
-    }
-
-    input, button {
-      width: 100%;
-      padding: 0.75rem;
-      margin: 0.5rem 0;
-      border: none;
-      border-radius: 5px;
-      font-size: 1rem;
-    }
-
-    input {
-      background: #f0f0f0;
       color: #333;
     }
 
-    input::placeholder {
-      color: #aaa;
-    }
-
-    button {
-      background: #007bff;
-      color: white;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #0056b3;
-    }
-
+    /* Chat Section */
     #messages {
-      height: 300px;
+      height: 400px;
       overflow-y: auto;
-      background: #f9f9f9;
+      background: #f0f2f5;
       padding: 1rem;
-      border: 1px solid #ddd;
-      border-radius: 5px;
+      border-radius: 8px;
       margin-bottom: 1rem;
       display: flex;
       flex-direction: column;
     }
 
     .msg {
-      padding: 0.5rem;
-      margin-bottom: 0.5rem;
-      border-radius: 5px;
-      background: #eef2f7;
+      padding: 10px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+      background: #f1f1f1;
       max-width: 80%;
       word-wrap: break-word;
       position: relative;
     }
 
     .me {
-      background: #d1e7fd;
+      background: #0078d4;
+      color: white;
       align-self: flex-end;
       text-align: right;
     }
 
     .other {
-      background: #e9ecef;
+      background: #f1f1f1;
+      color: #333;
       align-self: flex-start;
     }
 
     .timestamp {
       font-size: 0.7rem;
       color: #888;
-      margin-top: 0.25rem;
+      margin-top: 5px;
+    }
+
+    .seen-status {
+      font-size: 0.8rem;
+      color: #28a745;
+    }
+
+    .not-seen {
+      font-size: 0.8rem;
+      color: #dc3545;
     }
 
     .typing {
       font-size: 0.8rem;
       color: #aaa;
-      font-style: italic;
       position: absolute;
+      bottom: 10px;
       right: 10px;
-      top: 0;
     }
 
-    .seen {
-      color: #28a745;
-      font-size: 0.8rem;
-    }
-
-    .not-seen {
-      color: #dc3545;
-      font-size: 0.8rem;
-    }
-
+    /* Input Section */
     .input-container {
       display: flex;
       align-items: center;
+      padding: 10px;
+      border-top: 1px solid #ddd;
+      background: #fff;
+    }
+
+    .input-container input {
+      flex: 1;
+      padding: 10px;
+      border-radius: 20px;
+      border: 1px solid #ddd;
+      font-size: 1rem;
+      margin-right: 10px;
+      background: #f9f9f9;
+    }
+
+    .input-container button,
+    .file-label {
+      background: #0078d4;
+      color: white;
+      border-radius: 50%;
+      padding: 10px;
+      cursor: pointer;
+      border: none;
+    }
+
+    .file-label {
+      margin-right: 10px;
     }
 
     .file-input {
       display: none;
     }
 
-    .file-label {
-      background: #28a745;
-      padding: 0.5rem;
+    /* Buttons */
+    button {
+      width: 100%;
+      padding: 0.75rem;
+      margin-top: 10px;
+      border: none;
+      border-radius: 8px;
+      background-color: #0078d4;
       color: white;
       cursor: pointer;
-      border-radius: 5px;
-      margin-right: 1rem;
     }
 
-    .reaction {
-      cursor: pointer;
-      margin-left: 5px;
-      font-size: 1.5rem;
+    button:hover {
+      background-color: #005bb5;
     }
 
-    .reaction-container {
-      display: flex;
-      justify-content: flex-start;
-      margin-top: 0.25rem;
+    /* File Upload */
+    .file-input {
+      display: none;
     }
   </style>
 </head>
 <body>
   <div id="app">
+    <!-- Login Section -->
     <div id="loginSection">
       <h2>Login</h2>
       <input id="email" type="email" placeholder="Email" required>
@@ -154,13 +157,14 @@
       <p id="loginStatus" style="color: red;"></p>
     </div>
 
+    <!-- Chat Section -->
     <div id="chatSection" style="display:none;">
       <h2>Chat Room</h2>
       <div id="messages"></div>
       <div id="typingIndicator" class="typing" style="display: none;">Someone is typing...</div>
       <div class="input-container">
         <input id="msgInput" type="text" placeholder="Type a message..." onkeydown="handleKeyDown(event)">
-        <label class="file-label" for="fileInput">Attach Image</label>
+        <label class="file-label" for="fileInput">📎</label>
         <input type="file" id="fileInput" class="file-input" onchange="uploadImage()">
         <button onclick="sendMessage()">Send</button>
       </div>
@@ -176,6 +180,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <script>
+    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyA9KPmQOZtSvFv4OI05AxYYpzDwUT1A7nA",
       authDomain: "khn-chat.firebaseapp.com",
@@ -191,10 +196,10 @@
     const storage = firebase.storage();
 
     let currentUser = null;
-    let typingRef = db.ref('typing'); // Reference for typing status
-    let messageRef = db.ref('messages'); // Reference for messages
+    let typingRef = db.ref('typing');
+    let messageRef = db.ref('messages');
 
-    // Function to handle login
+    // Login function
     function login() {
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
@@ -210,12 +215,12 @@
         });
     }
 
-    // Function to handle logout
+    // Logout function
     function logout() {
       auth.signOut().then(() => location.reload());
     }
 
-    // Function to send a message (text or image)
+    // Send message (text or image)
     function sendMessage(imageUrl = '') {
       const msg = document.getElementById('msgInput').value.trim();
       if (!msg && !imageUrl) return;
@@ -229,10 +234,10 @@
       });
 
       document.getElementById('msgInput').value = '';
-      typingRef.set(false); // Hide typing indicator after sending message
+      typingRef.set(false);
     }
 
-    // Function to load chat messages
+    // Load chat messages
     function loadChat() {
       const messagesDiv = document.getElementById('messages');
       messagesDiv.innerHTML = '';
@@ -240,7 +245,7 @@
         const data = snapshot.val();
         const div = document.createElement('div');
         div.className = 'msg ' + (data.sender === currentUser.email ? 'me' : 'other');
-
+        
         let messageContent = `
           <div><strong>${data.sender}</strong></div>
           <div>${data.text}</div>
@@ -249,21 +254,25 @@
           messageContent += `<div><img src="${data.imageUrl}" style="max-width: 100%; height: auto;"></div>`;
         }
         messageContent += `<div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>`;
-        messageContent += `<div class="${data.seen ? 'seen' : 'not-seen'}">${data.seen ? 'Seen' : 'Not Seen'}</div>`;
-
+        messageContent += `<div class="${data.seen ? 'seen-status' : 'not-seen'}">${data.seen ? 'Seen' : 'Not Seen'}</div>`;
+        
         div.innerHTML = messageContent;
         messagesDiv.appendChild(div);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
       });
     }
 
-    // Function to update typing status
+    // Typing status indicator
     function handleKeyDown(event) {
-      const inputText = document.getElementById('msgInput').value.trim();
-      typingRef.set(inputText.length > 0);
+      const inputText = document.getElementById('msgInput').value;
+      if (inputText.length > 0) {
+        typingRef.set(true);
+      } else {
+        typingRef.set(false);
+      }
     }
 
-    // Function to upload an image and get the URL
+    // Handle image upload
     function uploadImage() {
       const file = document.getElementById('fileInput').files[0];
       if (!file) return;
@@ -279,22 +288,12 @@
       });
     }
 
-    // Function to clear the chat
+    // Clear chat
     function clearChat() {
       messageRef.remove();
     }
 
-    // Realtime listener for typing status
-    typingRef.on('value', snapshot => {
-      const isTyping = snapshot.val();
-      const typingIndicator = document.getElementById('typingIndicator');
-      if (isTyping) {
-        typingIndicator.style.display = 'block';
-      } else {
-        typingIndicator.style.display = 'none';
-      }
-    });
-
+    // Handle auth state change
     auth.onAuthStateChanged(user => {
       if (user) {
         currentUser = user;
