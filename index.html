@@ -26,7 +26,7 @@
       color: white;
     }
 
-    input, button, textarea {
+    input, button {
       width: 100%;
       padding: 0.75rem;
       margin: 0.5rem 0;
@@ -35,12 +35,12 @@
       font-size: 1rem;
     }
 
-    input, textarea {
+    input {
       background: #222;
       color: white;
     }
 
-    input::placeholder, textarea::placeholder {
+    input::placeholder {
       color: #aaa;
     }
 
@@ -91,9 +91,16 @@
       margin-top: 0.25rem;
     }
 
+    #typingIndicator {
+      font-size: 0.8rem;
+      color: gray;
+      margin-bottom: 0.5rem;
+    }
+
     img {
       max-width: 100%;
       border-radius: 5px;
+      margin-top: 5px;
     }
   </style>
 </head>
@@ -110,10 +117,10 @@
     <div id="chatSection" style="display:none;">
       <h2>Chat Room</h2>
       <div id="messages"></div>
-      <textarea id="msgInput" placeholder="Type a message..."></textarea>
+      <div id="typingIndicator"></div>
       <input type="file" id="fileInput" accept="image/*">
+      <input id="msgInput" type="text" placeholder="Type a message...">
       <button onclick="sendMessage()">Send</button>
-      <button onclick="clearChat()" style="background: #800;">Clear Chat</button>
       <button onclick="logout()" style="margin-top: 0.5rem;">Logout</button>
     </div>
   </div>
@@ -131,15 +138,13 @@
       projectId: "khn-chat",
       storageBucket: "khn-chat.appspot.com",
       messagingSenderId: "127670303843",
-      appId: "1:127670303843:web:3e3009ed10712e432c4c56",
-      measurementId: "G-MDQQEMCZLR"
+      appId: "1:127670303843:web:3e3009ed10712e432c4c56"
     };
-
     firebase.initializeApp(firebaseConfig);
+
     const auth = firebase.auth();
     const db = firebase.database();
     const storage = firebase.storage();
-
     let currentUser = null;
 
     function login() {
@@ -152,6 +157,7 @@
           document.getElementById('loginSection').style.display = 'none';
           document.getElementById('chatSection').style.display = 'block';
           loadChat();
+          monitorTyping();
         })
         .catch(err => {
           document.getElementById('loginStatus').textContent = err.message;
@@ -165,65 +171,83 @@
     function sendMessage() {
       const msgInput = document.getElementById('msgInput');
       const msg = msgInput.value.trim();
-      if (!msg) return;
-      msgInput.value = '';
-      db.ref('messages').push({
-        text: msg,
-        sender: currentUser.email,
-        timestamp: Date.now()
-      });
-    }
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
 
-    function uploadImage(event) {
-      const file = event.target.files[0];
-      if (!file) return;
+      if (!msg && !file) return;
 
-      const storageRef = storage.ref(`images/${Date.now()}_${file.name}`);
-      storageRef.put(file).then(snapshot => snapshot.ref.getDownloadURL())
-        .then(url => {
-          db.ref('messages').push({
-            text: `<img src="${url}" />`,
-            sender: currentUser.email,
-            timestamp: Date.now()
-          });
+      const sendData = (url = null) => {
+        db.ref('messages').push({
+          text: msg || '',
+          sender: currentUser.email,
+          timestamp: Date.now(),
+          image: url || null,
+          seen: false
         });
+        msgInput.value = '';
+        fileInput.value = '';
+      };
+
+      if (file) {
+        const ref = storage.ref('images/' + Date.now() + '_' + file.name);
+        ref.put(file).then(snapshot => {
+          snapshot.ref.getDownloadURL().then(sendData);
+        });
+      } else {
+        sendData();
+      }
     }
 
     function loadChat() {
       const messagesDiv = document.getElementById('messages');
       messagesDiv.innerHTML = '';
-      db.ref('messages').off();
       db.ref('messages').on('child_added', snapshot => {
         const data = snapshot.val();
+        const key = snapshot.key;
         const div = document.createElement('div');
         div.className = 'msg ' + (data.sender === currentUser.email ? 'me' : 'other');
         div.innerHTML = `
           <div><strong>${data.sender}</strong></div>
-          <div>${data.text}</div>
+          ${data.text ? `<div>${data.text}</div>` : ''}
+          ${data.image ? `<img src="${data.image}">` : ''}
           <div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>
+          ${data.sender === currentUser.email ? `<button onclick="deleteMessage('${key}')">Delete</button>` : ''}
+          ${data.seen && data.sender === currentUser.email ? '<div style="font-size: 0.7rem; color: #0f0;">Seen</div>' : ''}
         `;
         messagesDiv.appendChild(div);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
-      });
-    }
 
-    function clearChat() {
-      if (confirm("Are you sure you want to clear all messages?")) {
-        db.ref('messages').remove();
-        document.getElementById('messages').innerHTML = '';
-      }
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('msgInput').addEventListener('keydown', e => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          sendMessage();
+        // Mark as seen
+        if (data.sender !== currentUser.email) {
+          db.ref('messages/' + key).update({ seen: true });
         }
       });
+    }
 
-      document.getElementById('fileInput').addEventListener('change', uploadImage);
-    });
+    function deleteMessage(key) {
+      db.ref('messages/' + key).remove();
+    }
+
+    function monitorTyping() {
+      const msgInput = document.getElementById('msgInput');
+      msgInput.addEventListener('input', () => {
+        db.ref('typing/' + currentUser.uid).set(currentUser.email);
+        setTimeout(() => {
+          db.ref('typing/' + currentUser.uid).remove();
+        }, 2000);
+      });
+
+      db.ref('typing').on('value', snapshot => {
+        const typingIndicator = document.getElementById('typingIndicator');
+        const usersTyping = [];
+        snapshot.forEach(child => {
+          if (child.val() !== currentUser.email) {
+            usersTyping.push(child.val());
+          }
+        });
+        typingIndicator.textContent = usersTyping.length ? `${usersTyping.join(', ')} typing...` : '';
+      });
+    }
 
     auth.onAuthStateChanged(user => {
       if (user) {
@@ -231,6 +255,7 @@
         document.getElementById('loginSection').style.display = 'none';
         document.getElementById('chatSection').style.display = 'block';
         loadChat();
+        monitorTyping();
       }
     });
   </script>
