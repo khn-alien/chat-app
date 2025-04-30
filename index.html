@@ -5,92 +5,97 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Realtime Chat App</title>
   <style>
-   body {
-  font-family: Arial, sans-serif;
-  background: #000;
-  color: #fff;
-  margin: 0;
-  padding: 2rem;
-}
+    body {
+      font-family: Arial, sans-serif;
+      background: #000;
+      color: #fff;
+      margin: 0;
+      padding: 2rem;
+    }
 
-#app {
-  max-width: 600px;
-  margin: auto;
-  background: #111;
-  padding: 1rem;
-  border-radius: 8px;
-}
+    #app {
+      max-width: 600px;
+      margin: auto;
+      background: #111;
+      padding: 1rem;
+      border-radius: 8px;
+    }
 
-h2 {
-  text-align: center;
-  color: white;
-}
+    h2 {
+      text-align: center;
+      color: white;
+    }
 
-input, button {
-  width: 100%;
-  padding: 0.75rem;
-  margin: 0.5rem 0;
-  border: none;
-  border-radius: 5px;
-  font-size: 1rem;
-}
+    input, button, textarea {
+      width: 100%;
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+      border: none;
+      border-radius: 5px;
+      font-size: 1rem;
+    }
 
-input {
-  background: #222;
-  color: white;
-}
+    input, textarea {
+      background: #222;
+      color: white;
+    }
 
-input::placeholder {
-  color: #aaa;
-}
+    input::placeholder, textarea::placeholder {
+      color: #aaa;
+    }
 
-button {
-  background: #444;
-  color: white;
-  cursor: pointer;
-}
+    button {
+      background: #444;
+      color: white;
+      cursor: pointer;
+    }
 
-button:hover {
-  background: #666;
-}
+    button:hover {
+      background: #666;
+    }
 
-#messages {
-  height: 300px;
-  overflow-y: auto;
-  background: #000;
-  padding: 0.5rem;
-  border: 1px solid #333;
-  border-radius: 5px;
-  margin-bottom: 1rem;
-  display: flex;
-  flex-direction: column;
-}
+    #messages {
+      height: 300px;
+      overflow-y: auto;
+      background: #000;
+      padding: 0.5rem;
+      border: 1px solid #333;
+      border-radius: 5px;
+      margin-bottom: 1rem;
+      display: flex;
+      flex-direction: column;
+    }
 
-.msg {
-  padding: 0.5rem;
-  margin-bottom: 0.5rem;
-  border-radius: 5px;
-  background: #222;
-  max-width: 80%;
-  word-wrap: break-word;
-}
+    .msg {
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+      border-radius: 5px;
+      background: #222;
+      max-width: 80%;
+      word-wrap: break-word;
+    }
 
-.me {
-  background: #2e2e2e;
-  align-self: flex-end;
-  text-align: right;
-}
+    .me {
+      background: #2e2e2e;
+      align-self: flex-end;
+      text-align: right;
+    }
 
-.other {
-  align-self: flex-start;
-}
+    .other {
+      align-self: flex-start;
+    }
 
-.timestamp {
-  font-size: 0.7rem;
-  color: #aaa;
-  margin-top: 0.25rem;
-}
+    .timestamp {
+      font-size: 0.7rem;
+      color: #aaa;
+      margin-top: 0.25rem;
+    }
 
+    textarea {
+      min-height: 60px;
+      max-height: 120px;
+      resize: vertical;
+    }
   </style>
 </head>
 <body>
@@ -106,8 +111,9 @@ button:hover {
     <div id="chatSection" style="display:none;">
       <h2>Chat Room</h2>
       <div id="messages"></div>
-      <input id="msgInput" type="text" placeholder="Type a message...">
+      <textarea id="msgInput" placeholder="Type a message..."></textarea>
       <button onclick="sendMessage()">Send</button>
+      <button onclick="clearChat()">Clear Chat</button>
       <button onclick="logout()" style="margin-top: 0.5rem;">Logout</button>
     </div>
   </div>
@@ -118,15 +124,16 @@ button:hover {
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyA9KPmQOZtSvFv4OI05AxYYpzDwUT1A7nA",
-    authDomain: "khn-chat.firebaseapp.com",
-    projectId: "khn-chat",
-    storageBucket: "khn-chat.firebasestorage.app",
-    messagingSenderId: "127670303843",
-    appId: "1:127670303843:web:3e3009ed10712e432c4c56",
-    measurementId: "G-MDQQEMCZLR"
-  };
+    const firebaseConfig = {
+      apiKey: "AIzaSyA9KPmQOZtSvFv4OI05AxYYpzDwUT1A7nA",
+      authDomain: "khn-chat.firebaseapp.com",
+      projectId: "khn-chat",
+      storageBucket: "khn-chat.firebasestorage.app",
+      messagingSenderId: "127670303843",
+      appId: "1:127670303843:web:3e3009ed10712e432c4c56",
+      measurementId: "G-MDQQEMCZLR"
+    };
+
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
@@ -166,33 +173,50 @@ button:hover {
       document.getElementById('msgInput').value = '';
     }
 
-function loadChat() {
-  const messagesDiv = document.getElementById('messages');
-  messagesDiv.innerHTML = '';
-  db.ref('messages').on('child_added', snapshot => {
-    const data = snapshot.val();
-    const div = document.createElement('div');
-    div.className = 'msg ' + (data.sender === currentUser.email ? 'me' : 'other');
-    div.innerHTML = `
-      <div><strong>${data.sender}</strong></div>
-      <div>${data.text}</div>
-      <div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>
-    `;
-    messagesDiv.appendChild(div);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  });
-}
+    function clearChat() {
+      if (confirm("Are you sure you want to clear all chat messages?")) {
+        db.ref('messages').remove();
+        document.getElementById('messages').innerHTML = '';
+      }
+    }
 
+    function loadChat() {
+      const messagesDiv = document.getElementById('messages');
+      messagesDiv.innerHTML = '';
+      db.ref('messages').on('child_added', snapshot => {
+        const data = snapshot.val();
+        const div = document.createElement('div');
+        div.className = 'msg ' + (data.sender === currentUser.email ? 'me' : 'other');
+        div.innerHTML = `
+          <div><strong>${data.sender}</strong></div>
+          <div>${data.text.replace(/\n/g, '<br>')}</div>
+          <div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>
+        `;
+        messagesDiv.appendChild(div);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      });
+    }
 
-auth.onAuthStateChanged(user => {
-  if (user) {
-    currentUser = user;
-    document.getElementById('loginBox').style.display = 'none';
-    document.getElementById('chat').style.display = 'block';
-    loadChat(); // <--- This must be here
-  }
-});
+    // Enable Shift+Enter to send
+    document.addEventListener('DOMContentLoaded', () => {
+      const msgInput = document.getElementById('msgInput');
+      msgInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+    });
 
+    // Restore session if logged in
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        currentUser = user;
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('chatSection').style.display = 'block';
+        loadChat();
+      }
+    });
   </script>
 </body>
 </html>
