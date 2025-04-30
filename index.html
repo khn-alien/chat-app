@@ -6,7 +6,7 @@
   <title>Realtime Chat App</title>
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
+      font-family: 'Arial', sans-serif;
       background: #f4f4f4;
       color: #333;
       margin: 0;
@@ -148,8 +148,8 @@
   <div id="app">
     <div id="loginSection">
       <h2>Login</h2>
-      <input id="email" type="email" placeholder="Email">
-      <input id="password" type="password" placeholder="Password">
+      <input id="email" type="email" placeholder="Email" required>
+      <input id="password" type="password" placeholder="Password" required>
       <button onclick="login()">Login</button>
       <p id="loginStatus" style="color: red;"></p>
     </div>
@@ -191,17 +191,16 @@
     const storage = firebase.storage();
 
     let currentUser = null;
+    let typingRef = db.ref('typing'); // Reference for typing status
+    let messageRef = db.ref('messages'); // Reference for messages
 
-    // Monitor typing status in real-time
-    const typingRef = db.ref('typing');
-
+    // Function to handle login
     function login() {
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
       auth.signInWithEmailAndPassword(email, password)
         .then(userCredential => {
           currentUser = userCredential.user;
-          db.ref('users/' + currentUser.uid).set({ email: currentUser.email });
           document.getElementById('loginSection').style.display = 'none';
           document.getElementById('chatSection').style.display = 'block';
           loadChat();
@@ -211,82 +210,60 @@
         });
     }
 
+    // Function to handle logout
     function logout() {
       auth.signOut().then(() => location.reload());
     }
 
+    // Function to send a message (text or image)
     function sendMessage(imageUrl = '') {
       const msg = document.getElementById('msgInput').value.trim();
       if (!msg && !imageUrl) return;
 
-      db.ref('messages').push({
+      messageRef.push({
         text: msg,
         sender: currentUser.email,
         timestamp: Date.now(),
         seen: false,
-        imageUrl: imageUrl,
-        reactions: {}
+        imageUrl: imageUrl
       });
 
-      // Clear input field after sending message
       document.getElementById('msgInput').value = '';
-      typingRef.set(false); // Stop typing indicator after sending message
+      typingRef.set(false); // Hide typing indicator after sending message
     }
 
+    // Function to load chat messages
     function loadChat() {
       const messagesDiv = document.getElementById('messages');
       messagesDiv.innerHTML = '';
-      db.ref('messages').on('child_added', snapshot => {
+      messageRef.on('child_added', snapshot => {
         const data = snapshot.val();
         const div = document.createElement('div');
         div.className = 'msg ' + (data.sender === currentUser.email ? 'me' : 'other');
 
-        const messageContent = `
+        let messageContent = `
           <div><strong>${data.sender}</strong></div>
           <div>${data.text}</div>
-          ${data.imageUrl ? `<div><img src="${data.imageUrl}" alt="image" style="max-width: 100%; height: auto;"></div>` : ''}
-          <div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>
-          <div class="${data.seen ? 'seen' : 'not-seen'}">${data.seen ? 'Seen' : 'Not Seen'}</div>
         `;
+        if (data.imageUrl) {
+          messageContent += `<div><img src="${data.imageUrl}" style="max-width: 100%; height: auto;"></div>`;
+        }
+        messageContent += `<div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>`;
+        messageContent += `<div class="${data.seen ? 'seen' : 'not-seen'}">${data.seen ? 'Seen' : 'Not Seen'}</div>`;
 
         div.innerHTML = messageContent;
-        const reactionsDiv = document.createElement('div');
-        reactionsDiv.className = 'reaction-container';
-        
-        for (let emoji in data.reactions) {
-          const span = document.createElement('span');
-          span.className = 'reaction';
-          span.textContent = emoji;
-          reactionsDiv.appendChild(span);
-        }
-
-        div.appendChild(reactionsDiv);
-
-        div.onclick = () => reactToMessage(snapshot.key);
-
         messagesDiv.appendChild(div);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
       });
-
-      db.ref('messages').on('child_changed', snapshot => {
-        const messageId = snapshot.key;
-        const message = snapshot.val();
-        const messageDiv = document.querySelector(`[data-id="${messageId}"]`);
-
-        if (messageDiv) {
-          messageDiv.querySelector('.timestamp').textContent = new Date(message.timestamp).toLocaleTimeString();
-          messageDiv.querySelector('.seen').textContent = message.seen ? 'Seen' : 'Not Seen';
-        }
-      });
     }
 
-    function reactToMessage(messageId) {
-      const reaction = prompt("Enter your reaction (e.g. 👍, ❤️)");
-      if (!reaction) return;
-
-      db.ref('messages/' + messageId + '/reactions').push(reaction);
+    // Function to update typing status
+    function handleKeyDown(event) {
+      const inputText = document.getElementById('msgInput').value.trim();
+      typingRef.set(inputText.length > 0);
     }
 
+    // Function to upload an image and get the URL
     function uploadImage() {
       const file = document.getElementById('fileInput').files[0];
       if (!file) return;
@@ -302,14 +279,21 @@
       });
     }
 
+    // Function to clear the chat
     function clearChat() {
-      db.ref('messages').remove();
+      messageRef.remove();
     }
 
-    function handleKeyDown(event) {
-      const inputText = document.getElementById('msgInput').value.trim();
-      typingRef.set(inputText.length > 0); // Show typing status if there's text
-    }
+    // Realtime listener for typing status
+    typingRef.on('value', snapshot => {
+      const isTyping = snapshot.val();
+      const typingIndicator = document.getElementById('typingIndicator');
+      if (isTyping) {
+        typingIndicator.style.display = 'block';
+      } else {
+        typingIndicator.style.display = 'none';
+      }
+    });
 
     auth.onAuthStateChanged(user => {
       if (user) {
@@ -319,7 +303,6 @@
         loadChat();
       }
     });
-
   </script>
 </body>
 </html>
