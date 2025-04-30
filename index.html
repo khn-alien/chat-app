@@ -44,6 +44,14 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
+      overflow-anchor: none;
+    }
+
+    #messages::after {
+      content: "";
+      display: block;
+      height: 0;
+      overflow-anchor: auto;
     }
 
     .msg {
@@ -181,7 +189,6 @@
     const typingRef = db.ref('typing');
     const messagesRef = db.ref('messages');
 
-    // Throttle function for typing indicator
     const throttle = (func, limit) => {
       let lastFunc;
       let lastRan;
@@ -203,14 +210,12 @@
       }
     };
 
-    // XSS protection
     const escapeHtml = (text) => {
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
     };
 
-    // Login function
     async function login() {
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
@@ -223,17 +228,15 @@
       }
     }
 
-    // Initialize chat
     function initChat() {
       document.getElementById('loginSection').style.display = 'none';
       document.getElementById('chatSection').style.display = 'block';
-      
       setupMessageListener();
       setupTypingListener();
       setupEventListeners();
+      scrollToBottom();
     }
 
-    // Setup message listener
     function setupMessageListener() {
       if (messageListener) messagesRef.off('child_added', messageListener);
       
@@ -245,21 +248,16 @@
         let content = `
           <div><strong>${escapeHtml(data.sender)}</strong></div>
           ${data.text ? `<div>${escapeHtml(data.text)}</div>` : ''}
-          ${data.imageUrl ? `<img src="${data.imageUrl}" loading="lazy">` : ''}
+          ${data.imageUrl ? `<img src="${data.imageUrl}" onload="scrollToBottom()">` : ''}
           <div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>
         `;
         
         div.innerHTML = content;
         document.getElementById('messages').appendChild(div);
         scrollToBottom();
-        
-        // Handle image load
-        const img = div.querySelector('img');
-        if (img) img.onload = scrollToBottom;
       });
     }
 
-    // Setup typing listener
     function setupTypingListener() {
       if (typingListener) typingRef.off('value', typingListener);
       
@@ -274,17 +272,14 @@
       });
     }
 
-    // Setup event listeners
     function setupEventListeners() {
       const msgInput = document.getElementById('msgInput');
       const fileInput = document.getElementById('fileInput');
       
-      // Typing detection
       msgInput.addEventListener('input', throttle(() => {
         typingRef.child(currentUser.uid).set(msgInput.value.trim().length > 0);
       }, 300));
 
-      // Enter key to send
       msgInput.addEventListener('keypress', e => {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
@@ -292,16 +287,13 @@
         }
       });
 
-      // File upload
       fileInput.addEventListener('change', uploadImage);
       
-      // Clear typing status on exit
       window.addEventListener('beforeunload', () => {
         typingRef.child(currentUser.uid).set(false);
       });
     }
 
-    // Send message
     async function sendMessage() {
       const msgInput = document.getElementById('msgInput');
       const text = msgInput.value.trim();
@@ -322,7 +314,6 @@
       }
     }
 
-    // Upload image
     async function uploadImage() {
       const file = document.getElementById('fileInput').files[0];
       if (!file) return;
@@ -346,26 +337,24 @@
       }
     }
 
-    // Clear chat
     function clearChat() {
       if (confirm('Are you sure you want to clear all messages?')) {
         messagesRef.remove();
       }
     }
 
-    // Logout
     function logout() {
       auth.signOut();
       location.reload();
     }
 
-    // Scroll to bottom
     function scrollToBottom() {
       const messagesDiv = document.getElementById('messages');
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      requestAnimationFrame(() => {
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      });
     }
 
-    // Auth state listener
     auth.onAuthStateChanged(user => {
       if (user) {
         currentUser = user;
