@@ -26,16 +26,16 @@
       display: flex;
       flex-direction: column;
       height: 80vh;
-      overflow: hidden;
     }
 
     h2 {
       text-align: center;
       color: #333;
+      margin: 0 0 1rem;
     }
 
     #messages {
-      flex: 1;
+      height: 400px; /* Fixed height */
       overflow-y: auto;
       background: #f0f2f5;
       padding: 1rem;
@@ -44,14 +44,6 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
-      overflow-anchor: none;
-    }
-
-    #messages::after {
-      content: "";
-      display: block;
-      height: 0;
-      overflow-anchor: auto;
     }
 
     .msg {
@@ -131,6 +123,12 @@
       border-radius: 8px;
       margin-top: 5px;
     }
+
+    .auto-scroll-anchor {
+      float: left;
+      height: 1px;
+      visibility: hidden;
+    }
   </style>
 </head>
 <body>
@@ -188,6 +186,7 @@
     let typingListener = null;
     const typingRef = db.ref('typing');
     const messagesRef = db.ref('messages');
+    let autoScroll = true;
 
     const throttle = (func, limit) => {
       let lastFunc;
@@ -248,13 +247,36 @@
         let content = `
           <div><strong>${escapeHtml(data.sender)}</strong></div>
           ${data.text ? `<div>${escapeHtml(data.text)}</div>` : ''}
-          ${data.imageUrl ? `<img src="${data.imageUrl}" onload="scrollToBottom()">` : ''}
+          ${data.imageUrl ? `<img src="${data.imageUrl}">` : ''}
           <div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>
+          <div class="auto-scroll-anchor"></div>
         `;
         
         div.innerHTML = content;
-        document.getElementById('messages').appendChild(div);
-        scrollToBottom();
+        const messagesDiv = document.getElementById('messages');
+        messagesDiv.appendChild(div);
+        
+        if (autoScroll) {
+          requestAnimationFrame(() => {
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+          });
+        }
+
+        const img = div.querySelector('img');
+        if (img) {
+          img.onload = () => {
+            if (autoScroll) {
+              messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            }
+          };
+        }
+      });
+
+      const messagesDiv = document.getElementById('messages');
+      messagesDiv.addEventListener('scroll', () => {
+        const threshold = 100;
+        const atBottom = messagesDiv.scrollHeight - messagesDiv.scrollTop <= messagesDiv.clientHeight + threshold;
+        autoScroll = atBottom;
       });
     }
 
@@ -350,9 +372,7 @@
 
     function scrollToBottom() {
       const messagesDiv = document.getElementById('messages');
-      requestAnimationFrame(() => {
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-      });
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
     auth.onAuthStateChanged(user => {
