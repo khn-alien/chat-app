@@ -35,7 +35,7 @@
     }
 
     #messages {
-      height: 400px; /* Fixed height */
+      height: 400px;
       overflow-y: auto;
       background: #f0f2f5;
       padding: 1rem;
@@ -118,10 +118,32 @@
       display: none;
     }
 
-    img {
-      max-width: 200px;
+    .image-container {
+      position: relative;
+      background: #f0f0f0;
       border-radius: 8px;
+      overflow: hidden;
       margin-top: 5px;
+    }
+
+    .image-loading {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.8);
+      color: #666;
+      font-size: 0.9rem;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+      display: block;
     }
 
     .auto-scroll-anchor {
@@ -247,7 +269,13 @@
         let content = `
           <div><strong>${escapeHtml(data.sender)}</strong></div>
           ${data.text ? `<div>${escapeHtml(data.text)}</div>` : ''}
-          ${data.imageUrl ? `<img src="${data.imageUrl}">` : ''}
+          ${data.imageUrl ? `
+            <div class="image-container">
+              <img src="${data.imageUrl}" alt="Uploaded image" 
+                   onload="this.parentElement.style.backgroundImage = 'none'">
+              <div class="image-loading">Loading image...</div>
+            </div>
+          ` : ''}
           <div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>
           <div class="auto-scroll-anchor"></div>
         `;
@@ -255,7 +283,7 @@
         div.innerHTML = content;
         const messagesDiv = document.getElementById('messages');
         messagesDiv.appendChild(div);
-        
+
         if (autoScroll) {
           requestAnimationFrame(() => {
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -341,21 +369,29 @@
       if (!file) return;
 
       try {
-        const storageRef = storage.ref(`images/${Date.now()}_${file.name}`);
-        await storageRef.put(file);
-        const url = await storageRef.getDownloadURL();
+        // Generate unique filename
+        const filename = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+        const storageRef = storage.ref(`images/${filename}`);
         
+        // Upload file
+        const snapshot = await storageRef.put(file);
+        
+        // Get download URL
+        const url = await snapshot.ref.getDownloadURL();
+
+        // Create message with image
         await messagesRef.push({
-          text: '',
           sender: currentUser.email,
           timestamp: Date.now(),
+          text: '',
           imageUrl: url
         });
-        
+
+        // Reset file input
         document.getElementById('fileInput').value = '';
       } catch (error) {
         console.error('Upload failed:', error);
-        alert('Image upload failed. Please try again.');
+        alert(`Image upload failed: ${error.message}`);
       }
     }
 
