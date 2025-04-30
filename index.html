@@ -142,6 +142,7 @@
     <div id="chatSection" style="display:none;">
       <h2>Chat Room</h2>
       <div id="messages"></div>
+      <div id="typingIndicator" class="typing" style="display: none;">Someone is typing...</div>
       <div class="input-container">
         <input id="msgInput" type="text" placeholder="Type a message..." onkeydown="handleKeyDown(event)">
         <label class="file-label" for="fileInput">Attach Image</label>
@@ -151,8 +152,6 @@
       <button onclick="logout()" style="margin-top: 1rem;">Logout</button>
       <button onclick="clearChat()" style="margin-top: 0.5rem;">Clear Chat</button>
     </div>
-
-    <div id="typingIndicator" class="typing" style="display: none;">Typing...</div>
   </div>
 
   <!-- Firebase SDKs -->
@@ -201,16 +200,16 @@
       auth.signOut().then(() => location.reload());
     }
 
-    function sendMessage() {
+    function sendMessage(imageUrl = '') {
       const msg = document.getElementById('msgInput').value.trim();
-      if (!msg) return;
+      if (!msg && !imageUrl) return;
 
       db.ref('messages').push({
         text: msg,
         sender: currentUser.email,
         timestamp: Date.now(),
         seen: false,
-        imageUrl: ''
+        imageUrl: imageUrl
       });
 
       // Clear input field after sending message
@@ -245,16 +244,6 @@
         messagesDiv.appendChild(div);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
       });
-
-      // Handle typing status in real-time
-      typingRef.on('value', snapshot => {
-        const typingData = snapshot.val();
-        if (typingData) {
-          document.getElementById('typingIndicator').style.display = 'block';
-        } else {
-          document.getElementById('typingIndicator').style.display = 'none';
-        }
-      });
     }
 
     function handleKeyDown(event) {
@@ -273,9 +262,12 @@
       if (!file) return;
 
       const storageRef = storage.ref('images/' + file.name);
-      storageRef.put(file).then(snapshot => {
+      const uploadTask = storageRef.put(file);
+      uploadTask.on('state_changed', () => {}, (err) => {
+        console.error(err);
+      }, () => {
         storageRef.getDownloadURL().then(url => {
-          sendMessage(url); // Send image URL as part of the message
+          sendMessage(url);
         });
       });
     }
@@ -284,7 +276,14 @@
       db.ref('messages').remove();
     }
 
-    // Initializing the app
+    // Monitor typing status in real-time
+    typingRef.on('value', (snapshot) => {
+      const typing = snapshot.val();
+      const typingIndicator = document.getElementById('typingIndicator');
+      typingIndicator.style.display = typing ? 'block' : 'none';
+    });
+
+    // Initialize the app
     auth.onAuthStateChanged(user => {
       if (user) {
         currentUser = user;
