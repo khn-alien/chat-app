@@ -34,7 +34,6 @@
       color: #333;
     }
 
-    /* Chat Messages */
     #messages {
       flex: 1;
       overflow-y: auto;
@@ -44,13 +43,12 @@
       margin-bottom: 1rem;
       display: flex;
       flex-direction: column;
+      gap: 10px;
     }
 
     .msg {
       padding: 10px;
-      margin-bottom: 15px;
       border-radius: 8px;
-      background: #f1f1f1;
       max-width: 80%;
       word-wrap: break-word;
       position: relative;
@@ -60,125 +58,102 @@
       background: #0078d4;
       color: white;
       align-self: flex-end;
-      text-align: right;
     }
 
     .other {
-      background: #f1f1f1;
+      background: #e9ecef;
       color: #333;
       align-self: flex-start;
     }
 
     .timestamp {
       font-size: 0.7rem;
-      color: #888;
+      color: rgba(255, 255, 255, 0.8);
       margin-top: 5px;
     }
 
-    .seen-status {
-      font-size: 0.8rem;
-      color: #28a745;
-    }
-
-    .not-seen {
-      font-size: 0.8rem;
-      color: #dc3545;
+    .other .timestamp {
+      color: rgba(0, 0, 0, 0.6);
     }
 
     .typing {
       font-size: 0.8rem;
-      color: #aaa;
-      position: absolute;
-      bottom: 10px;
-      right: 10px;
+      color: #6c757d;
+      font-style: italic;
+      margin: 5px 0;
     }
 
-    /* Input Section */
     .input-container {
       display: flex;
-      align-items: center;
+      gap: 10px;
       padding: 10px;
-      border-top: 1px solid #ddd;
+      border-top: 1px solid #dee2e6;
       background: #fff;
     }
 
-    .input-container input {
+    input {
       flex: 1;
       padding: 12px;
       border-radius: 20px;
-      border: 1px solid #ddd;
+      border: 1px solid #dee2e6;
       font-size: 1rem;
-      margin-right: 10px;
-      background: #f9f9f9;
     }
 
-    .input-container button,
-    .file-label {
+    button, .file-label {
       background: #0078d4;
       color: white;
-      border-radius: 50%;
-      padding: 12px;
-      cursor: pointer;
       border: none;
+      padding: 10px 20px;
+      border-radius: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
     }
 
-    .file-label {
-      margin-right: 10px;
+    button:hover, .file-label:hover {
+      background: #0056b3;
     }
 
     .file-input {
       display: none;
     }
 
-    /* Buttons */
-    button {
-      width: 100%;
-      padding: 0.75rem;
-      margin-top: 10px;
-      border: none;
+    img {
+      max-width: 200px;
       border-radius: 8px;
-      background-color: #0078d4;
-      color: white;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background-color: #005bb5;
-    }
-
-    .file-input {
-      display: none;
+      margin-top: 5px;
     }
   </style>
 </head>
 <body>
   <div id="app">
-    <!-- Login Section -->
     <div id="loginSection">
       <h2>Login</h2>
       <input id="email" type="email" placeholder="Email" required>
       <input id="password" type="password" placeholder="Password" required>
       <button onclick="login()">Login</button>
-      <p id="loginStatus" style="color: red;"></p>
+      <p id="loginStatus" style="color: red; font-size: 0.9rem;"></p>
     </div>
 
-    <!-- Chat Section -->
     <div id="chatSection" style="display:none;">
       <h2>Chat Room</h2>
       <div id="messages"></div>
-      <div id="typingIndicator" class="typing" style="display: none;">Someone is typing...</div>
+      <div id="typingIndicator" class="typing"></div>
       <div class="input-container">
-        <input id="msgInput" type="text" placeholder="Type a message..." onkeydown="handleKeyDown(event)">
-        <label class="file-label" for="fileInput">📎</label>
-        <input type="file" id="fileInput" class="file-input" onchange="uploadImage()">
+        <label class="file-label">
+          📎
+          <input type="file" id="fileInput" class="file-input" accept="image/*">
+        </label>
+        <input id="msgInput" type="text" placeholder="Type a message...">
         <button onclick="sendMessage()">Send</button>
       </div>
-      <button onclick="logout()" style="margin-top: 1rem;">Logout</button>
-      <button onclick="clearChat()" style="margin-top: 0.5rem;">Clear Chat</button>
+      <div style="display: flex; gap: 10px; margin-top: 1rem;">
+        <button onclick="logout()">Logout</button>
+        <button onclick="clearChat()" style="background: #dc3545;">Clear Chat</button>
+      </div>
     </div>
   </div>
 
-  <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -189,138 +164,216 @@
       apiKey: "AIzaSyA9KPmQOZtSvFv4OI05AxYYpzDwUT1A7nA",
       authDomain: "khn-chat.firebaseapp.com",
       projectId: "khn-chat",
-      storageBucket: "khn-chat.firebasestorage.app",
+      storageBucket: "khn-chat.appspot.com",
       messagingSenderId: "127670303843",
       appId: "1:127670303843:web:3e3009ed10712e432c4c56",
       measurementId: "G-MDQQEMCZLR"
     };
-    firebase.initializeApp(firebaseConfig);
+
+    const app = firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
     const storage = firebase.storage();
 
     let currentUser = null;
-    let typingRef = db.ref('typing');
-    let messageRef = db.ref('messages');
+    let messageListener = null;
+    let typingListener = null;
+    const typingRef = db.ref('typing');
+    const messagesRef = db.ref('messages');
+
+    // Throttle function for typing indicator
+    const throttle = (func, limit) => {
+      let lastFunc;
+      let lastRan;
+      return function() {
+        const context = this;
+        const args = arguments;
+        if (!lastRan) {
+          func.apply(context, args);
+          lastRan = Date.now();
+        } else {
+          clearTimeout(lastFunc);
+          lastFunc = setTimeout(() => {
+            if ((Date.now() - lastRan) >= limit) {
+              func.apply(context, args);
+              lastRan = Date.now();
+            }
+          }, limit - (Date.now() - lastRan));
+        }
+      }
+    };
+
+    // XSS protection
+    const escapeHtml = (text) => {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    };
 
     // Login function
-    function login() {
+    async function login() {
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
-      auth.signInWithEmailAndPassword(email, password)
-        .then(userCredential => {
-          currentUser = userCredential.user;
-          document.getElementById('loginSection').style.display = 'none';
-          document.getElementById('chatSection').style.display = 'block';
-          loadChat();
-        })
-        .catch(err => {
-          document.getElementById('loginStatus').textContent = err.message;
-        });
+      try {
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        currentUser = userCredential.user;
+        initChat();
+      } catch (error) {
+        document.getElementById('loginStatus').textContent = error.message;
+      }
     }
 
-    // Logout function
-    function logout() {
-      auth.signOut().then(() => location.reload());
+    // Initialize chat
+    function initChat() {
+      document.getElementById('loginSection').style.display = 'none';
+      document.getElementById('chatSection').style.display = 'block';
+      
+      setupMessageListener();
+      setupTypingListener();
+      setupEventListeners();
     }
 
-    // Send message (text or image)
-    function sendMessage(imageUrl = '') {
-      const msg = document.getElementById('msgInput').value.trim();
-      if (!msg && !imageUrl) return;
-
-      messageRef.push({
-        text: msg,
-        sender: currentUser.email,
-        timestamp: Date.now(),
-        seen: false,
-        imageUrl: imageUrl
-      });
-
-      document.getElementById('msgInput').value = '';
-      typingRef.set(false);
-    }
-
-    // Load chat messages
-    function loadChat() {
-      const messagesDiv = document.getElementById('messages');
-      messagesDiv.innerHTML = '';
-      messageRef.on('child_added', snapshot => {
+    // Setup message listener
+    function setupMessageListener() {
+      if (messageListener) messagesRef.off('child_added', messageListener);
+      
+      messageListener = messagesRef.on('child_added', snapshot => {
         const data = snapshot.val();
         const div = document.createElement('div');
-        div.className = 'msg ' + (data.sender === currentUser.email ? 'me' : 'other');
+        div.className = `msg ${data.sender === currentUser.email ? 'me' : 'other'}`;
         
-        let messageContent = `
-          <div><strong>${data.sender}</strong></div>
-          <div>${data.text}</div>
+        let content = `
+          <div><strong>${escapeHtml(data.sender)}</strong></div>
+          ${data.text ? `<div>${escapeHtml(data.text)}</div>` : ''}
+          ${data.imageUrl ? `<img src="${data.imageUrl}" loading="lazy">` : ''}
+          <div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>
         `;
-        if (data.imageUrl) {
-          messageContent += `<div><img src="${data.imageUrl}" style="max-width: 100%; height: auto;"></div>`;
-        }
-        messageContent += `<div class="timestamp">${new Date(data.timestamp).toLocaleTimeString()}</div>`;
-        messageContent += `<div class="${data.seen ? 'seen-status' : 'not-seen'}">${data.seen ? 'Seen' : 'Not Seen'}</div>`;
         
-        div.innerHTML = messageContent;
-        messagesDiv.appendChild(div);
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        div.innerHTML = content;
+        document.getElementById('messages').appendChild(div);
+        scrollToBottom();
+        
+        // Handle image load
+        const img = div.querySelector('img');
+        if (img) img.onload = scrollToBottom;
       });
     }
 
-    // Handle keypress to trigger typing indicator
-    function handleKeyDown(event) {
-      const typingRef = db.ref('typing/' + currentUser.uid);
-      const inputText = document.getElementById('msgInput').value;
-      if (inputText.length > 0) {
-        typingRef.set(true);
-      } else {
-        typingRef.set(false);
+    // Setup typing listener
+    function setupTypingListener() {
+      if (typingListener) typingRef.off('value', typingListener);
+      
+      typingListener = typingRef.on('value', snapshot => {
+        const typingUsers = Object.entries(snapshot.val() || {})
+          .filter(([uid, isTyping]) => uid !== currentUser?.uid && isTyping)
+          .map(([uid]) => uid);
+
+        const indicator = document.getElementById('typingIndicator');
+        indicator.textContent = typingUsers.length > 0 ? 
+          `${typingUsers.length} user${typingUsers.length > 1 ? 's' : ''} typing...` : '';
+      });
+    }
+
+    // Setup event listeners
+    function setupEventListeners() {
+      const msgInput = document.getElementById('msgInput');
+      const fileInput = document.getElementById('fileInput');
+      
+      // Typing detection
+      msgInput.addEventListener('input', throttle(() => {
+        typingRef.child(currentUser.uid).set(msgInput.value.trim().length > 0);
+      }, 300));
+
+      // Enter key to send
+      msgInput.addEventListener('keypress', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+
+      // File upload
+      fileInput.addEventListener('change', uploadImage);
+      
+      // Clear typing status on exit
+      window.addEventListener('beforeunload', () => {
+        typingRef.child(currentUser.uid).set(false);
+      });
+    }
+
+    // Send message
+    async function sendMessage() {
+      const msgInput = document.getElementById('msgInput');
+      const text = msgInput.value.trim();
+      if (!text) return;
+
+      try {
+        await messagesRef.push({
+          text: text,
+          sender: currentUser.email,
+          timestamp: Date.now(),
+          imageUrl: ''
+        });
+        
+        msgInput.value = '';
+        typingRef.child(currentUser.uid).set(false);
+      } catch (error) {
+        console.error('Error sending message:', error);
       }
     }
 
-    // Show typing indicator for all users
-    typingRef.on('value', snapshot => {
-      const typingStatus = snapshot.val();
-      const typingIndicator = document.getElementById('typingIndicator');
-      if (Object.values(typingStatus).includes(true)) {
-        typingIndicator.style.display = 'block';
-      } else {
-        typingIndicator.style.display = 'none';
-      }
-    });
-
-    // Handle image upload
-    function uploadImage() {
+    // Upload image
+    async function uploadImage() {
       const file = document.getElementById('fileInput').files[0];
       if (!file) return;
 
-      const storageRef = storage.ref('images/' + file.name);
-      const uploadTask = storageRef.put(file);
-      uploadTask.on('state_changed', () => {}, (err) => {
-        console.error(err);
-      }, () => {
-        storageRef.getDownloadURL().then(url => {
-          sendMessage(url);
+      try {
+        const storageRef = storage.ref(`images/${Date.now()}_${file.name}`);
+        await storageRef.put(file);
+        const url = await storageRef.getDownloadURL();
+        
+        await messagesRef.push({
+          text: '',
+          sender: currentUser.email,
+          timestamp: Date.now(),
+          imageUrl: url
         });
-      });
+        
+        document.getElementById('fileInput').value = '';
+      } catch (error) {
+        console.error('Upload failed:', error);
+        alert('Image upload failed. Please try again.');
+      }
     }
 
-    // Clear chat history
+    // Clear chat
     function clearChat() {
-      messageRef.remove();
+      if (confirm('Are you sure you want to clear all messages?')) {
+        messagesRef.remove();
+      }
     }
 
-    // Update seen status when message is read
-    function updateSeenStatus(messageId) {
-      messageRef.child(messageId).update({ seen: true });
+    // Logout
+    function logout() {
+      auth.signOut();
+      location.reload();
     }
 
-    // Auth state change handling
+    // Scroll to bottom
+    function scrollToBottom() {
+      const messagesDiv = document.getElementById('messages');
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    // Auth state listener
     auth.onAuthStateChanged(user => {
       if (user) {
         currentUser = user;
-        document.getElementById('loginSection').style.display = 'none';
-        document.getElementById('chatSection').style.display = 'block';
-        loadChat();
+        initChat();
+      } else {
+        currentUser = null;
+        document.getElementById('loginSection').style.display = 'block';
+        document.getElementById('chatSection').style.display = 'none';
       }
     });
   </script>
