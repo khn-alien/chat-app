@@ -1,4 +1,4 @@
-// Firebase config (replace with your provided Firebase config)
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyA9KPmQOZtSvFv4OI05AxYYpzDwUT1A7nA",
   authDomain: "khn-chat.firebaseapp.com",
