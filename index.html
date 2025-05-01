@@ -3,204 +3,248 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Messenger Clone</title>
+    <title>KHN Chat</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emoji-mart/react"></script>
     <style>
         :root {
             --primary: #0084ff;
-            --background: #f0f2f5;
-            --message-bg: #ffffff;
-            --online: #31a24c;
+            --bg: #f0f2f5;
         }
 
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: Arial, sans-serif;
         }
 
         body {
-            background: var(--background);
+            background: var(--bg);
             height: 100vh;
-        }
-
-        /* Authentication Screen */
-        .auth-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-
-        .auth-box {
-            background: white;
-            padding: 2rem;
-            border-radius: 1rem;
-            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
-            width: 400px;
-        }
-
-        /* Main App Layout */
-        .app-container {
-            display: flex;
-            height: 100vh;
-        }
-
-        .sidebar {
-            width: 300px;
-            border-right: 1px solid #ddd;
-            background: white;
-        }
-
-        .chat-container {
-            flex: 1;
             display: flex;
             flex-direction: column;
+        }
+
+        #auth-container, #chat-container {
+            max-width: 500px;
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            background: white;
+            padding: 10px 15px;
+            border-radius: 15px;
+            max-width: 80%;
+            align-self: flex-start;
+        }
+
+        .message.own {
+            align-self: flex-end;
+            background: var(--primary);
+            color: white;
+        }
+
+        #message-form {
+            display: flex;
+            gap: 10px;
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #ddd;
+        }
+
+        .emoji-picker {
+            position: absolute;
+            bottom: 70px;
+            right: 20px;
         }
     </style>
 </head>
 <body>
-    <!-- Authentication Screen -->
-    <div id="authScreen" class="auth-container">
-        <div class="auth-box">
-            <h2>Messenger Clone</h2>
-            <input type="email" id="email" placeholder="Email">
-            <input type="password" id="password" placeholder="Password">
-            <button onclick="handleAuth()">Continue</button>
-            <p id="authError" style="color: red;"></p>
-            <p onclick="toggleAuthMode()" style="cursor: pointer;">Switch to Sign Up</p>
-        </div>
+    <div id="auth-container" style="display: none;">
+        <form class="auth-form" id="login-form">
+            <h2>Login</h2>
+            <input type="email" id="login-email" placeholder="Email" required>
+            <input type="password" id="login-password" placeholder="Password" required>
+            <button type="submit">Login</button>
+            <button type="button" onclick="showSignup()">Create Account</button>
+        </form>
+
+        <form class="auth-form" id="signup-form" style="display: none;">
+            <h2>Sign Up</h2>
+            <input type="text" id="signup-name" placeholder="Name" required>
+            <input type="email" id="signup-email" placeholder="Email" required>
+            <input type="password" id="signup-password" placeholder="Password" required>
+            <button type="submit">Create Account</button>
+            <button type="button" onclick="showLogin()">Back to Login</button>
+        </form>
     </div>
 
-    <!-- Main App -->
-    <div id="app" class="app-container" style="display: none;">
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <div id="userList"></div>
-        </div>
-
-        <!-- Chat Area -->
-        <div class="chat-container">
-            <div id="chatHeader"></div>
-            <div id="chatMessages"></div>
-            <div class="message-input">
-                <input type="text" id="messageInput" placeholder="Type a message...">
-                <input type="file" id="fileInput">
-                <button onclick="sendMessage()">Send</button>
-            </div>
-        </div>
+    <div id="chat-container" style="display: none;">
+        <div id="messages"></div>
+        <form id="message-form">
+            <button type="button" onclick="toggleEmojiPicker()">😀</button>
+            <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
+            <button type="submit">Send</button>
+        </form>
+        <div id="emoji-picker" class="emoji-picker"></div>
     </div>
-
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
     <script>
         // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyA9KPmQOZtSvFv4OI05AxYYpzDwUT1A7nA",
             authDomain: "khn-chat.firebaseapp.com",
+            databaseURL: "https://khn-chat-default-rtdb.firebaseio.com",
             projectId: "khn-chat",
-            storageBucket: "khn-chat.appspot.com",
+            storageBucket: "khn-chat.firebasestorage.app",
             messagingSenderId: "127670303843",
             appId: "1:127670303843:web:3e3009ed10712e432c4c56",
             measurementId: "G-MDQQEMCZLR"
         };
 
         // Initialize Firebase
-        const app = firebase.initializeApp(firebaseConfig);
+        firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
-        const db = firebase.database();
-        const storage = firebase.storage();
+        const db = firebase.firestore();
 
-        // App State
-        let currentUser = null;
-        let selectedUserId = null;
-        let currentChatId = null;
-        let isSignUp = false;
-
-        // Authentication
-        async function handleAuth() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-
-            try {
-                if (isSignUp) {
-                    await auth.createUserWithEmailAndPassword(email, password);
-                    await createUserProfile();
-                } else {
-                    await auth.signInWithEmailAndPassword(email, password);
-                }
-                initializeApp();
-            } catch (error) {
-                document.getElementById('authError').textContent = error.message;
+        // Auth State Listener
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                document.getElementById('auth-container').style.display = 'none';
+                document.getElementById('chat-container').style.display = 'flex';
+                loadMessages();
+            } else {
+                document.getElementById('auth-container').style.display = 'block';
+                document.getElementById('chat-container').style.display = 'none';
+                showLogin();
             }
+        });
+
+        // Auth Functions
+        document.getElementById('login-form').addEventListener('submit', e => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            auth.signInWithEmailAndPassword(email, password).catch(alert);
+        });
+
+        document.getElementById('signup-form').addEventListener('submit', e => {
+            e.preventDefault();
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            const name = document.getElementById('signup-name').value;
+            auth.createUserWithEmailAndPassword(email, password)
+                .then(cred => cred.user.updateProfile({ displayName: name }))
+                .catch(alert);
+        });
+
+        function showSignup() {
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('signup-form').style.display = 'flex';
         }
 
-        async function createUserProfile() {
-            await db.ref(`users/${auth.currentUser.uid}`).set({
-                email: auth.currentUser.email,
-                displayName: auth.currentUser.email.split('@')[0],
-                online: true,
-                lastActive: Date.now()
+        function showLogin() {
+            document.getElementById('signup-form').style.display = 'none';
+            document.getElementById('login-form').style.display = 'flex';
+        }
+
+        // Chat Functions
+        function loadMessages() {
+            db.collection('messages')
+                .orderBy('timestamp')
+                .onSnapshot(snapshot => {
+                    const messages = [];
+                    snapshot.forEach(doc => messages.push(doc.data()));
+                    displayMessages(messages);
+                });
+        }
+
+        function displayMessages(messages) {
+            const container = document.getElementById('messages');
+            container.innerHTML = '';
+            messages.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = `message ${msg.uid === auth.currentUser?.uid ? 'own' : ''}`;
+                div.innerHTML = `
+                    <strong>${msg.displayName}</strong>
+                    <p>${msg.text}</p>
+                    <small>${new Date(msg.timestamp?.toDate()).toLocaleTimeString()}</small>
+                `;
+                container.appendChild(div);
             });
+            container.scrollTop = container.scrollHeight;
         }
 
-        // Presence System
-        function setupPresence() {
-            const userStatusRef = db.ref(`status/${currentUser.uid}`);
-            const isOffline = {
-                online: false,
-                lastActive: firebase.database.ServerValue.TIMESTAMP
-            };
-
-            db.ref('.info/connected').on('value', (snapshot) => {
-                if (snapshot.val()) {
-                    userStatusRef.onDisconnect().set(isOffline);
-                    userStatusRef.set({ online: true });
-                }
-            });
-        }
-
-        // Chat System
-        function selectUser(partnerId) {
-            selectedUserId = partnerId;
-            currentChatId = [currentUser.uid, partnerId].sort().join('_');
-            loadChatHistory();
-        }
-
-        async function sendMessage() {
-            const message = {
-                sender: currentUser.uid,
-                text: document.getElementById('messageInput').value,
-                timestamp: Date.now()
-            };
-
-            if (document.getElementById('fileInput').files[0]) {
-                message.image = await uploadFile();
+        // Message Submission
+        document.getElementById('message-form').addEventListener('submit', e => {
+            e.preventDefault();
+            const messageInput = document.getElementById('message-input');
+            const message = messageInput.value.trim();
+            
+            if (message) {
+                db.collection('messages').add({
+                    text: message,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    uid: auth.currentUser.uid,
+                    displayName: auth.currentUser.displayName
+                });
+                messageInput.value = '';
             }
+        });
 
-            db.ref(`chats/${currentChatId}/messages`).push(message);
+        // Emoji Picker
+        let picker = null;
+        async function toggleEmojiPicker() {
+            if (!picker) {
+                const { Picker } = await import('https://cdn.jsdelivr.net/npm/@emoji-mart/react');
+                picker = new Picker({
+                    onEmojiSelect: (emoji) => {
+                        document.getElementById('message-input').value += emoji.native;
+                    },
+                    data: await fetch('https://cdn.jsdelivr.net/npm/@emoji-mart/data').then(res => res.json())
+                });
+                document.getElementById('emoji-picker').appendChild(picker);
+            }
+            document.getElementById('emoji-picker').style.display = 
+                document.getElementById('emoji-picker').style.display === 'none' ? 'block' : 'none';
         }
-
-        async function uploadFile() {
-            const file = document.getElementById('fileInput').files[0];
-            const storageRef = storage.ref(`messages/${currentUser.uid}/${Date.now()}_${file.name}`);
-            await storageRef.put(file);
-            return await storageRef.getDownloadURL();
-        }
-
-        // Initialize App
-        function initializeApp() {
-            currentUser = auth.currentUser;
-            document.getElementById('authScreen').style.display = 'none';
-            document.getElementById('app').style.display = 'flex';
-            setupPresence();
-            loadUsers();
-        }
-
     </script>
 </body>
 </html>
