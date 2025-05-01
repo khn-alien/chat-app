@@ -4,21 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Firebase React Chat App</title>
-  <!-- Tailwind CSS -->
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- React CDN -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <!-- Babel -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <!-- Firebase SDK v9 Compat -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-</head>
-<body class="bg-gray-100 h-screen flex items-center justify-center">
-  <div id="root" class="w-full h-full"></div>
-  <script type="text/babel">
+  <!-- Firebase SDK v9 Modular -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+    import { getDatabase, ref, set, onValue, serverTimestamp, onDisconnect, remove, update, push, child, get } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+    import React, { useEffect, useState } from "https://esm.sh/react@18.2.0";
+    import ReactDOM from "https://esm.sh/react-dom@18.2.0/client";
+
     const firebaseConfig = {
       apiKey: "AIzaSyA9KPmQOZtSvFv4OI05AxYYpzDwUT1A7nA",
       authDomain: "khn-chat.firebaseapp.com",
@@ -30,31 +25,38 @@
       measurementId: "G-MDQQEMCZLR"
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.database();
-
-    const { useState, useEffect } = React;
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
 
     function App() {
       const [user, setUser] = useState(null);
 
       useEffect(() => {
-        auth.onAuthStateChanged((u) => {
+        console.log("Checking authentication state...");  // Log when the effect runs
+        onAuthStateChanged(auth, (u) => {
+          console.log("User state changed:", u);  // Log the user data
           setUser(u);
           if (u) {
-            const userStatusRef = db.ref(`/status/${u.uid}`);
-            db.ref(".info/connected").on("value", (snap) => {
+            const userStatusRef = ref(db, `/status/${u.uid}`);
+            onValue(ref(db, ".info/connected"), (snap) => {
               if (snap.val() === true) {
-                userStatusRef.onDisconnect().set({ state: 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP });
-                userStatusRef.set({ state: 'online', last_changed: firebase.database.ServerValue.TIMESTAMP });
+                onDisconnect(userStatusRef).set({ state: 'offline', last_changed: serverTimestamp() });
+                set(userStatusRef, { state: 'online', last_changed: serverTimestamp() });
               }
             });
           }
         });
       }, []);
 
-      if (!user) return <Login />;
+      useEffect(() => {
+        console.log("Current user:", user);  // Log the current user state
+      }, [user]);
+
+      if (!user) {
+        console.log("User is not logged in, showing login screen...");  // Log when user is not logged in
+        return <Login />;
+      }
       return <ChatInterface user={user} />;
     }
 
@@ -65,7 +67,7 @@
 
       const handleLogin = async () => {
         try {
-          await auth.signInWithEmailAndPassword(email, password);
+          await signInWithEmailAndPassword(auth, email, password);
         } catch (e) {
           setError(e.message);
         }
@@ -73,7 +75,7 @@
 
       const handleSignup = async () => {
         try {
-          await auth.createUserWithEmailAndPassword(email, password);
+          await createUserWithEmailAndPassword(auth, email, password);
         } catch (e) {
           setError(e.message);
         }
@@ -92,14 +94,148 @@
     }
 
     function ChatInterface({ user }) {
+      const [users, setUsers] = useState([]);
+      const [selected, setSelected] = useState(null);
+
+      useEffect(() => {
+        onValue(ref(db, 'users'), (snapshot) => {
+          const data = snapshot.val() || {};
+          const list = Object.keys(data).map(uid => ({ uid, ...data[uid] }));
+          setUsers(list.filter(u => u.uid !== user.uid));
+        });
+        set(ref(db, `users/${user.uid}`), { email: user.email });
+      }, [user]);
+
       return (
-        <div className="flex h-full items-center justify-center">
-          <p className="text-lg">Welcome, {user.email}</p>
+        <div className="flex h-full">
+          <UserList users={users} select={setSelected} selected={selected} />
+          {selected ? <ChatBox me={user} peer={selected} /> : <div className="flex-1 flex items-center justify-center text-gray-500">Select a user to chat</div>}
         </div>
       );
     }
 
-    ReactDOM.render(<App />, document.getElementById("root"));
+    function UserList({ users, select, selected }) {
+      const [status, setStatus] = useState({});
+
+      useEffect(() => {
+        onValue(ref(db, 'status'), (snap) => {
+          setStatus(snap.val() || {});
+        });
+      }, []);
+
+      return (
+        <div className="w-64 bg-white p-4 overflow-y-auto">
+          <h3 className="text-xl mb-4">Users</h3>
+          {users.map(u => (
+            <div
+              key={u.uid}
+              onClick={() => select(u)}
+              className={`p-2 mb-2 rounded cursor-pointer ${selected && selected.uid === u.uid ? 'bg-blue-100' : ''}`}
+            >
+              <div className="flex justify-between">
+                <span>{u.email.split('@')[0]}</span>
+                <span className={`h-3 w-3 rounded-full ${status[u.uid]?.state === 'online' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    function ChatBox({ me, peer }) {
+      const chatId = [me.uid, peer.uid].sort().join('_');
+      const msgsRef = ref(db, `messages/${chatId}`);
+      const typingRef = ref(db, `typing/${chatId}`);
+      const [messages, setMessages] = useState([]);
+      const [input, setInput] = useState('');
+      const [typing, setTyping] = useState({});
+
+      useEffect(() => {
+        onValue(msgsRef, (snap) => {
+          const val = snap.val() || {};
+          setMessages(Object.values(val));
+        });
+        onValue(typingRef, (snap) => {
+          setTyping(snap.val() || {});
+        });
+      }, [chatId]);
+
+      const sendMsg = () => {
+        const newMsgRef = push(msgsRef);
+        set(newMsgRef, {
+          id: newMsgRef.key,
+          from: me.uid,
+          text: input,
+          timestamp: Date.now(),
+          reactions: {},
+          seen: false
+        });
+        setInput('');
+        remove(ref(db, `typing/${chatId}/${me.uid}`));
+      };
+
+      const handleTyping = e => {
+        setInput(e.target.value);
+        const refPath = ref(db, `typing/${chatId}/${me.uid}`);
+        if (e.target.value) set(refPath, true);
+        else remove(refPath);
+      };
+
+      const markSeen = () => {
+        messages.forEach(msg => {
+          if (!msg.seen && msg.from !== me.uid) {
+            update(ref(db, `messages/${chatId}/${msg.id}`), { seen: true });
+          }
+        });
+      };
+
+      useEffect(() => { markSeen(); }, [messages]);
+
+      const deleteChat = () => remove(msgsRef);
+
+      const reactTo = (msgId, emoji) => {
+        set(ref(db, `messages/${chatId}/${msgId}/reactions/${me.uid}`), emoji);
+      };
+
+      return (
+        <div className="flex-1 flex flex-col bg-white p-4">
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="text-xl">Chat with {peer.email.split('@')[0]}</h4>
+            <button onClick={deleteChat} className="text-red-500">Delete Chat</button>
+          </div>
+          <div className="flex-1 overflow-y-auto mb-4">
+            {messages
+              .sort((a, b) => {
+                const ta = typeof a.timestamp === 'number' ? a.timestamp : (a.timestamp?.seconds || 0);
+                const tb = typeof b.timestamp === 'number' ? b.timestamp : (b.timestamp?.seconds || 0);
+                return ta - tb;
+              })
+              .map(msg => (
+              <div key={msg.id} className={`mb-2 p-2 rounded ${msg.from===me.uid?'bg-blue-100 self-end':'bg-gray-100 self-start'} relative`}>
+                <div>{msg.text}</div>
+                <div className="flex space-x-1 mt-1">
+                  {['👍','❤️','😂','😮','😢'].map(e=> (
+                    <span key={e} onClick={()=>reactTo(msg.id, e)} className="cursor-pointer">{e}</span>
+                  ))}
+                </div>
+                <div className="absolute bottom-1 right-2 text-xs text-gray-400">
+                  {msg.seen ? 'Seen' : 'Not Seen'}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center">
+            <input value={input} onChange={handleTyping} placeholder="Type a message..." className="w-full p-2 border rounded" />
+            <button onClick={sendMsg} className="ml-2 bg-blue-500 text-white p-2 rounded">Send</button>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
   </script>
+</head>
+<body class="bg-gray-100">
+  <div id="root"></div>
 </body>
 </html>
