@@ -1,13 +1,16 @@
-// Firebase config (replace with your own Firebase config)
+// Firebase config (replace with your provided Firebase config)
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyA9KPmQOZtSvFv4OI05AxYYpzDwUT1A7nA",
+  authDomain: "khn-chat.firebaseapp.com",
+  databaseURL: "https://khn-chat-default-rtdb.firebaseio.com",
+  projectId: "khn-chat",
+  storageBucket: "khn-chat.firebasestorage.app",
+  messagingSenderId: "127670303843",
+  appId: "1:127670303843:web:3e3009ed10712e432c4c56",
+  measurementId: "G-MDQQEMCZLR"
 };
 
+// Initialize Firebase
 const app = firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const firestore = firebase.firestore();
